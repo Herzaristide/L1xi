@@ -1,0 +1,473 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Language {
+  id          String @id // ISO language codes: "en", "es", "fr", "ja", "ko", "zh"
+  name        String // "English", "Spanish", "French", "Japanese", "Korean", "Chinese"
+  nativeName  String // "English", "Español", "Français", "日本語", "한국어", "中文"
+  alphabet    String // "Latin", "Cyrillic", "Hiragana/Katakana/Kanji", "Hangul", "Hanzi"
+  flag        String? // Flag emoji or image URL
+  difficulty  Int?    @db.SmallInt // 1-5 difficulty rating for learners
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  nativeUsers       User[] @relation("NativeLanguage")
+  learningUsers     User[] @relation("LearningLanguage")
+  cardFronts        Card[] @relation("CardFrontLanguage")
+  cardBacks         Card[] @relation("CardBackLanguage")
+  versionFronts     CardVersion[] @relation("VersionFrontLanguage")
+  versionBacks      CardVersion[] @relation("VersionBackLanguage")
+  
+  @@map("languages")
+}
+
+model User {
+  id                 String   @id @default(cuid())
+  email              String   @unique @db.VarChar(255)
+  username           String   @unique @db.VarChar(50)
+  password           String   @db.VarChar(255) // For hashed passwords
+  firstName          String?  @db.VarChar(100)
+  lastName           String?  @db.VarChar(100)
+  role               UserRole @default(USER)
+  nativeLanguageId   String   // Foreign key to Language
+  learningLanguageId String   // Foreign key to Language
+  
+  // Subscription fields
+  subscriptionStatus    SubscriptionStatus @default(FREE)
+  subscriptionStartDate DateTime?
+  subscriptionEndDate   DateTime?
+  trialEndDate         DateTime?
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Language Relations
+  nativeLanguage   Language @relation("NativeLanguage", fields: [nativeLanguageId], references: [id])
+  learningLanguage Language @relation("LearningLanguage", fields: [learningLanguageId], references: [id])
+
+  // Relations
+  ownedCards       Card[]
+  ownedDecks       Deck[]
+  cardStatuses     UserCardStatus[]
+  deckStatuses     UserDeckStatus[]
+  cardVersions     CardVersion[]
+  cardRatings      CardRating[]
+  deckRatings      DeckRating[]
+  cardCertifications CardCertification[]
+  deckCertifications DeckCertification[]
+
+  @@index([nativeLanguageId])
+  @@index([learningLanguageId])
+  @@index([role])
+  @@index([subscriptionStatus])
+  @@index([subscriptionEndDate])
+  @@index([subscriptionStatus, subscriptionEndDate]) // Composite index for subscription queries
+  @@index([createdAt])
+  @@map("users")
+}
+
+model Card {
+  id              String   @id @default(cuid())
+  type            CardType @default(TRANSLATION)
+  
+  // Content fields
+  front           String
+  back            String
+  hint            String?
+  options         String[] @default([]) // For MULTIPLE_CHOICE cards
+  audioUrl        String?  // For audio cards
+  imageUrl        String?  // For image cards
+  
+  // Language specification for content
+  frontLanguageId String?  // Language of the front content
+  backLanguageId  String?  // Language of the back content
+  
+  // Metadata
+  tags            String[] @default([])
+  difficulty      Int?     @db.SmallInt // 1-5 difficulty level
+  isShared        Boolean  @default(false) // Cards are private by default
+  isArchived      Boolean  @default(false)
+  isSystem        Boolean  @default(false) // System cards (official content)
+  systemCategory  String?  // Category for system cards: "vocabulary", "grammar", "pronunciation"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Foreign keys
+  ownerId String? // Original creator of the card - NULL for system cards
+  owner   User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  
+  // Language relations
+  frontLanguage Language? @relation("CardFrontLanguage", fields: [frontLanguageId], references: [id])
+  backLanguage  Language? @relation("CardBackLanguage", fields: [backLanguageId], references: [id])
+
+  // Relations
+  userStatuses UserCardStatus[]
+  deckCards    DeckCard[]
+  statistics   CardStatistics?
+  versions     CardVersion[]
+  ratings      CardRating[]
+  certification CardCertification?
+
+  @@index([ownerId])
+  @@index([type])
+  @@index([isShared])
+  @@index([tags])
+  @@index([frontLanguageId])
+  @@index([backLanguageId])
+  @@index([difficulty])
+  @@index([createdAt])
+  @@index([isArchived])
+  @@index([isSystem])
+  @@index([systemCategory])
+  @@index([isShared, type]) // Composite index for finding shared cards of specific type
+  @@index([frontLanguageId, backLanguageId]) // Composite index for language pairs
+  @@index([isShared, isArchived]) // Composite for active shared cards
+  @@index([isSystem, systemCategory]) // Composite for system content categorization
+  @@index([isSystem, frontLanguageId]) // System cards by language
+  @@map("cards")
+}
+
+model CardStatistics {
+  id                    String   @id @default(cuid())
+  
+  // Usage statistics
+  totalViews            Int      @default(0) // How many times viewed across all users
+  totalReviews          Int      @default(0) // How many times reviewed/studied
+  uniqueUsers           Int      @default(0) // How many different users studied this card
+  
+  // Performance statistics  
+  averageQuality        Float?   // Average quality score (0-5) across all reviews
+  successRate           Float?   // Percentage of correct answers
+  averageReviewTime     Int?     // Average time spent reviewing (in seconds)
+  
+  // Difficulty metrics
+  averageAttempts       Float?   // Average attempts before mastery
+  masteryRate           Float?   // Percentage of users who mastered this card
+  
+  // Engagement metrics
+  bookmarkCount         Int      @default(0) // How many users bookmarked decks containing this card
+  shareCount            Int      @default(0) // How many times this card was shared
+  
+  // Time metrics
+  lastViewedAt          DateTime?
+  lastReviewedAt        DateTime?
+  updatedAt             DateTime @updatedAt
+  createdAt             DateTime @default(now())
+
+  // Foreign key
+  cardId String @unique
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([totalViews])
+  @@index([successRate])
+  @@index([averageQuality])
+  @@index([lastReviewedAt])
+  @@map("card_statistics")
+}
+
+model CardVersion {
+  id            String   @id @default(cuid())
+  version       Int      // Version number (1, 2, 3, ...)
+  
+  // Content snapshot
+  type          CardType
+  front         String
+  back          String
+  hint          String?
+  options       String[] @default([])
+  audioUrl      String?
+  imageUrl      String?
+  tags          String[] @default([])
+  difficulty    Int?     @db.SmallInt
+  
+  // Language specification
+  frontLanguageId String?
+  backLanguageId  String?
+  
+  // Version metadata
+  changeReason    String?  @db.Text // Why this change was made
+  changesSummary  String?  @db.Text // Summary of what changed
+  createdAt       DateTime @default(now())
+
+  // Foreign keys
+  cardId    String
+  createdBy String // User who made this version
+  card      Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  creator   User @relation(fields: [createdBy], references: [id])
+
+  // Language relations (optional, for historical reference)
+  frontLanguage Language? @relation("VersionFrontLanguage", fields: [frontLanguageId], references: [id])
+  backLanguage  Language? @relation("VersionBackLanguage", fields: [backLanguageId], references: [id])
+
+  @@unique([cardId, version]) // Ensure unique version numbers per card
+  @@index([cardId])
+  @@index([createdBy])
+  @@index([createdAt])
+  @@map("card_versions")
+}
+
+model CardRating {
+  id        String   @id @default(cuid())
+  rating    Int      @db.SmallInt // 1-5 star rating
+  comment   String?  @db.Text // Optional written review
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  userId String
+  cardId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card   Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cardId]) // One rating per user per card
+  @@index([cardId])
+  @@index([rating])
+  @@map("card_ratings")
+}
+
+model CardCertification {
+  id               String   @id @default(cuid())
+  isCertified      Boolean  @default(false)
+  certificationNote String? @db.Text // Admin's note about certification
+  certifiedAt      DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Foreign keys
+  cardId        String @unique // One certification per card
+  certifiedBy   String // Admin who certified
+  card          Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  administrator User @relation(fields: [certifiedBy], references: [id])
+
+  @@index([isCertified])
+  @@index([certifiedBy])
+  @@index([certifiedAt])
+  @@map("card_certifications")
+}
+
+model DeckRating {
+  id        String   @id @default(cuid())
+  rating    Int      @db.SmallInt // 1-5 star rating
+  comment   String?  @db.Text // Optional written review
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  userId String
+  deckId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deck   Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deckId]) // One rating per user per deck
+  @@index([deckId])
+  @@index([rating])
+  @@map("deck_ratings")
+}
+
+model DeckCertification {
+  id               String   @id @default(cuid())
+  isCertified      Boolean  @default(false)
+  certificationNote String? @db.Text // Admin's note about certification
+  certifiedAt      DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Foreign keys
+  deckId        String @unique // One certification per deck
+  certifiedBy   String // Admin who certified
+  deck          Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  administrator User @relation(fields: [certifiedBy], references: [id])
+
+  @@index([isCertified])
+  @@index([certifiedBy])
+  @@index([certifiedAt])
+  @@map("deck_certifications")
+}
+
+model DeckStatistics {
+  id                    String   @id @default(cuid())
+  
+  // Usage statistics
+  totalViews            Int      @default(0) // How many times viewed across all users
+  totalStudySessions    Int      @default(0) // How many study sessions completed
+  uniqueUsers           Int      @default(0) // How many different users studied this deck
+  
+  // Performance statistics  
+  averageRating         Float?   // Average user rating (1-5)
+  completionRate        Float?   // Percentage of users who completed the deck
+  averageCompletionTime Int?     // Average time to complete deck (in minutes)
+  
+  // Content metrics
+  cardCount             Int      @default(0) // Number of cards in deck
+  averageCardDifficulty Float?   // Average difficulty of cards in deck
+  
+  // Engagement metrics
+  bookmarkCount         Int      @default(0) // How many users bookmarked this deck
+  shareCount            Int      @default(0) // How many times this deck was shared
+  forkCount             Int      @default(0) // How many times deck was copied/forked
+  
+  // Time metrics
+  lastViewedAt          DateTime?
+  lastStudiedAt         DateTime?
+  updatedAt             DateTime @updatedAt
+  createdAt             DateTime @default(now())
+
+  // Foreign key
+  deckId String @unique
+  deck   Deck   @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@index([totalViews])
+  @@index([averageRating])
+  @@index([completionRate])
+  @@index([lastStudiedAt])
+  @@map("deck_statistics")
+}
+
+model Deck {
+  id              String   @id @default(cuid())
+  title           String
+  description     String?
+  isShared        Boolean  @default(false) // Decks are private by default
+  isArchived      Boolean  @default(false)
+  isSystem        Boolean  @default(false) // System decks (official content)
+  systemCategory  String?  // Category for system decks: "beginner", "intermediate", "advanced", "official"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Foreign keys
+  ownerId String? // Original creator of the deck - NULL for system decks
+  owner   User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  // Relations
+  userStatuses UserDeckStatus[]
+  deckCards    DeckCard[]
+  ratings      DeckRating[]
+  certification DeckCertification?
+  statistics   DeckStatistics?
+
+  @@index([ownerId])
+  @@index([isShared])
+  @@index([createdAt])
+  @@index([isArchived])
+  @@index([isSystem])
+  @@index([systemCategory])
+  @@index([isShared, isArchived]) // Composite for active shared decks
+  @@index([isSystem, systemCategory]) // Composite for system content categorization
+  @@map("decks")
+}
+
+model DeckCard {
+  id        String   @id @default(cuid())
+  deckId    String
+  cardId    String
+  createdAt DateTime @default(now())
+
+  deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([deckId, cardId])
+  @@index([deckId])
+  @@index([cardId])
+  @@map("deck_cards")
+}
+
+enum CardType {
+  TRANSLATION      // Word/phrase translation (most common)
+  DEFINITION       // Word with definition in same language  
+  AUDIO_TEXT       // Audio pronunciation with text
+  IMAGE_TEXT       // Image with text description
+  FILL_BLANK       // Fill in the blank exercise
+  MULTIPLE_CHOICE  // Multiple choice question
+  GRAMMAR          // Grammar pattern practice
+  CONVERSATION     // Dialogue/conversation practice
+}
+
+enum LearningStatus {
+  NEW
+  LEARNING
+  REVIEW
+  MASTERED
+  ARCHIVED
+}
+
+enum UserRole {
+  USER      // Can only edit their own cards/decks
+  ADMIN     // Can edit all cards/decks + certify content
+  MODO      // Can edit all cards/decks + moderate content
+}
+
+enum SubscriptionStatus {
+  FREE         // Free tier
+  PREMIUM      // Premium subscription
+  PRO          // Professional subscription
+  ENTERPRISE   // Enterprise subscription
+  TRIAL        // Trial period
+  EXPIRED      // Subscription expired
+  SUSPENDED    // Subscription suspended
+}
+
+model UserCardStatus {
+  id              String        @id @default(cuid())
+  status          LearningStatus @default(NEW)
+  
+  // Current state
+  lastReviewedAt  DateTime?
+  nextReviewAt    DateTime?
+  reviewCount     Int           @default(0)
+  correctCount    Int           @default(0)
+  
+  // Spaced repetition data (from last review)
+  lastQuality     Int?          @db.SmallInt // 0-5 rating from last review
+  interval        Int           @default(1) // Days until next review
+  repetition      Int           @default(0) // Number of successful reviews
+  easiness        Float         @default(2.5) // Easiness factor for spaced repetition
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Foreign keys
+  userId String
+  cardId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card   Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cardId])
+  @@index([userId])
+  @@index([cardId])
+  @@index([status])
+  @@index([nextReviewAt])
+  @@map("user_card_statuses")
+}
+
+model UserDeckStatus {
+  id         String   @id @default(cuid())
+  isBookmarked Boolean @default(false) // User bookmarked this shared deck
+  accessedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Foreign keys
+  userId String
+  deckId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deck   Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deckId])
+  @@index([userId])
+  @@index([deckId])
+  @@index([isBookmarked])
+  @@index([accessedAt])
+  @@map("user_deck_statuses")
+}

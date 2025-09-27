@@ -1,0 +1,25 @@
+<!-- Simple SVG icon that can be converted to PNG icons -->
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" rx="64" fill="#3B82F6"/>
+  
+  <!-- Main icon content -->
+  <g transform="translate(128, 128)">
+    <!-- Book/Card stack representation -->
+    <rect x="0" y="0" width="256" height="180" rx="16" fill="white" opacity="0.9"/>
+    <rect x="16" y="16" width="224" height="148" rx="8" fill="#3B82F6" stroke="white" stroke-width="4"/>
+    
+    <!-- Card lines -->
+    <line x1="40" y1="64" x2="216" y2="64" stroke="white" stroke-width="6" stroke-linecap="round"/>
+    <line x1="40" y1="96" x2="184" y2="96" stroke="white" stroke-width="4" stroke-linecap="round"/>
+    <line x1="40" y1="120" x2="200" y2="120" stroke="white" stroke-width="4" stroke-linecap="round"/>
+    
+    <!-- Small decorative elements -->
+    <circle cx="200" cy="40" r="8" fill="white" opacity="0.8"/>
+    <circle cx="220" cy="40" r="6" fill="white" opacity="0.6"/>
+  </g>
+  
+  <!-- Bottom text area -->
+  <rect x="64" y="380" width="384" height="64" rx="32" fill="white" opacity="0.9"/>
+  <text x="256" y="420" font-family="Arial, sans-serif" font-size="32" font-weight="bold" text-anchor="middle" fill="#3B82F6">L1xi</text>
+</svg>

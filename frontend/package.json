@@ -1,0 +1,52 @@
+{
+  "name": "l1xi-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for L1xi flashcard app",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "build:electron": "tsc && cross-env ELECTRON_MODE=true vite build",
+    "build:pwa": "tsc && cross-env NODE_ENV=production vite build",
+    "preview": "vite preview",
+    "preview:pwa": "vite preview --port 3000 --host",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint src --ext ts,tsx --fix",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^3.3.2",
+    "@tanstack/react-query": "^4.36.1",
+    "axios": "^1.6.0",
+    "clsx": "^2.0.0",
+    "framer-motion": "^10.16.4",
+    "lucide-react": "^0.290.0",
+    "react": "^18.2.0",
+    "react-confetti": "^6.1.0",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.47.0",
+    "react-hot-toast": "^2.4.1",
+    "react-router-dom": "^6.17.0",
+    "tailwind-merge": "^2.0.0",
+    "zod": "^3.22.4",
+    "zustand": "^4.4.4"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vitejs/plugin-react": "^4.0.3",
+    "autoprefixer": "^10.4.16",
+    "cross-env": "^7.0.3",
+    "esbuild": "^0.18.20",
+    "eslint": "^8.45.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.3",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.5",
+    "typescript": "^5.0.2",
+    "vite": "^4.4.5",
+    "vite-plugin-pwa": "^0.17.0"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "name": "L1xi - Language Flashcards",
+  "short_name": "L1xi",
+  "description": "Master languages with intelligent spaced repetition flashcards",
+  "start_url": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["education", "productivity"],
+  "screenshots": [
+    {
+      "src": "screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "L1xi Dashboard"
+    },
+    {
+      "src": "screenshot-narrow.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "L1xi Study Mode"
+    }
+  ],
+  "icons": [
+    {
+      "src": "pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Study Cards",
+      "short_name": "Study",
+      "description": "Start studying your flashcards",
+      "url": "/study",
+      "icons": [
+        {
+          "src": "pwa-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Create Deck",
+      "short_name": "Create",
+      "description": "Create a new deck of cards",
+      "url": "/decks/new",
+      "icons": [
+        {
+          "src": "pwa-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

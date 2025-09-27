@@ -1,0 +1,155 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-gray-200;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary-600 text-white hover:bg-primary-700 px-4 py-2;
+  }
+
+  .btn-secondary {
+    @apply btn bg-gray-100 text-gray-900 hover:bg-gray-200 px-4 py-2;
+  }
+
+  .btn-ghost {
+    @apply btn hover:bg-gray-100 hover:text-gray-900 px-4 py-2;
+  }
+
+  .btn-outline {
+    @apply btn border border-gray-300 bg-transparent hover:bg-gray-50 px-4 py-2;
+  }
+
+  .card {
+    @apply bg-white rounded-lg border border-gray-200 shadow-sm;
+  }
+
+  .input {
+    @apply flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .label {
+    @apply text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70;
+  }
+
+  .flashcard {
+    @apply relative w-full h-64 perspective-1000;
+  }
+
+  .flashcard-inner {
+    @apply relative w-full h-full transition-transform duration-500 transform-style-preserve-3d cursor-pointer;
+  }
+
+  .flashcard-inner.flipped {
+    @apply rotate-y-180;
+  }
+
+  .flashcard-face {
+    @apply absolute inset-0 w-full h-full bg-white rounded-lg border-2 border-gray-200 shadow-lg backface-hidden flex items-center justify-center p-6;
+  }
+
+  .flashcard-back {
+    @apply rotate-y-180;
+  }
+}
+
+@layer utilities {
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+
+  .transform-style-preserve-3d {
+    transform-style: preserve-3d;
+  }
+
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* PWA Window Controls Overlay Support */
+@media (display-mode: standalone) {
+  .pwa-titlebar {
+    app-region: drag;
+    padding-left: env(titlebar-area-x, 0);
+    padding-top: env(titlebar-area-y, 0);
+    width: env(titlebar-area-width, 100%);
+    height: env(titlebar-area-height, 64px);
+  }
+
+  .pwa-safe-area {
+    app-region: no-drag;
+  }
+
+  .pwa-app-title {
+    app-region: drag;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Hide scrollbars in standalone mode for cleaner look */
+  body {
+    overflow-x: hidden;
+  }
+
+  /* Custom title bar styling */
+  .pwa-titlebar {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+}
+
+/* Window Controls Overlay specific styles */
+@supports (app-region: drag) {
+  .pwa-titlebar {
+    app-region: drag;
+  }
+
+  .pwa-safe-area,
+  .pwa-safe-area * {
+    app-region: no-drag;
+  }
+}
