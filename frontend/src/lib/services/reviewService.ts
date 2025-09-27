@@ -26,6 +26,9 @@ export interface ReviewResponse {
   nextReviewAt: string;
   streakUpdated: boolean;
   easeFactor: number;
+  reviewCount: number;
+  correctCount: number;
+  userCardStatus: any;
 }
 
 export class ReviewService {

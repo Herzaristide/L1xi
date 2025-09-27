@@ -16,6 +16,15 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
       return res.status(400).json({
         success: false,
         message: 'Invalid review data. Quality must be between 0 and 5.',
+        details: {
+          cardId: cardId ? 'valid' : 'required',
+          quality:
+            quality !== undefined
+              ? quality >= 0 && quality <= 5
+                ? 'valid'
+                : 'must be 0-5'
+              : 'required',
+        },
       });
     }
 
@@ -195,15 +204,37 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
       success: true,
       message: 'Review submitted successfully',
       data: {
+        id: userCardStatus.id,
+        quality,
+        timeSpent: timeSpent || 0,
+        newStatus: reviewData.status,
+        newInterval: reviewData.interval,
+        nextReviewAt: nextReviewAt.toISOString(),
+        streakUpdated: quality >= 3,
+        easeFactor: reviewData.easiness,
+        reviewCount: userCardStatus.reviewCount,
+        correctCount: userCardStatus.correctCount,
         userCardStatus,
-        nextReview: nextReviewAt,
       },
     });
   } catch (error) {
     console.error('Submit review error:', error);
+
+    // More detailed error logging
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        cardId: req.body.cardId,
+        quality: req.body.quality,
+        userId: req.user?.id,
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: 'Internal server error',
+      message: 'Internal server error while processing review',
+      details: process.env.NODE_ENV === 'development' ? error : undefined,
     });
   }
 });

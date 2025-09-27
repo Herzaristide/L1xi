@@ -1,0 +1,140 @@
+/* Keyboard Component Styles */
+.keyboard-container {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.keyboard-key {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New',
+    monospace;
+  font-variant-ligatures: none;
+  text-align: center;
+  min-width: 2.5rem;
+  background: linear-gradient(145deg, #ffffff, #f5f5f5);
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.keyboard-key:hover:not(:disabled) {
+  background: linear-gradient(145deg, #f8f9fa, #e9ecef);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transform: translateY(-1px);
+}
+
+.keyboard-key:active:not(:disabled),
+.keyboard-key.active {
+  background: linear-gradient(145deg, #3b82f6, #2563eb);
+  color: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(1px);
+}
+
+.keyboard-key:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f5f5f5;
+  color: #9ca3af;
+}
+
+/* Special key styling */
+.keyboard-key.special {
+  background: linear-gradient(145deg, #f3f4f6, #e5e7eb);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.keyboard-key.special:hover:not(:disabled) {
+  background: linear-gradient(145deg, #e5e7eb, #d1d5db);
+}
+
+/* Space bar special styling */
+.keyboard-key.space {
+  background: linear-gradient(145deg, #ffffff, #f9fafb);
+  border-radius: 1rem;
+}
+
+/* Active state colors for special keys */
+.keyboard-key.caps-active {
+  background: linear-gradient(145deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.keyboard-key.shift-active {
+  background: linear-gradient(145deg, #3b82f6, #2563eb);
+  color: white;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .keyboard-key {
+    min-width: 2rem;
+    height: 2.5rem !important;
+    font-size: 0.75rem;
+  }
+
+  .keyboard-container {
+    padding: 1rem;
+  }
+
+  .keyboard-row {
+    gap: 0.125rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .keyboard-key {
+    min-width: 1.5rem;
+    height: 2rem !important;
+    font-size: 0.625rem;
+  }
+
+  .keyboard-container {
+    padding: 0.5rem;
+  }
+}
+
+/* Animation for key press feedback */
+@keyframes keyPress {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.keyboard-key.pressed {
+  animation: keyPress 0.1s ease-in-out;
+}
+
+/* Accessibility improvements */
+.keyboard-key:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Dark mode support (if needed) */
+@media (prefers-color-scheme: dark) {
+  .keyboard-container {
+    background: #1f2937;
+  }
+
+  .keyboard-key {
+    background: linear-gradient(145deg, #374151, #4b5563);
+    color: #f9fafb;
+    border-color: #6b7280;
+  }
+
+  .keyboard-key:hover:not(:disabled) {
+    background: linear-gradient(145deg, #4b5563, #6b7280);
+  }
+}

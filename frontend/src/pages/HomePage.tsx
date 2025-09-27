@@ -3,9 +3,35 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { Check } from 'lucide-react';
+import { Keyboard } from '@/components/ui/Keyboard';
+import { Check, Keyboard as KeyboardIcon } from 'lucide-react';
 import { ReviewService, CardService } from '@/lib/services';
 import type { Card as CardType } from '@/lib/services';
+
+// Language to keyboard layout mapping
+const getKeyboardLayout = (languageName?: string) => {
+  if (!languageName) return 'latin';
+
+  const lang = languageName.toLowerCase();
+
+  if (lang.includes('russian') || lang.includes('cyrillic')) {
+    return 'cyrillic';
+  } else if (
+    lang.includes('chinese') ||
+    lang.includes('mandarin') ||
+    lang.includes('cantonese')
+  ) {
+    return 'chinese';
+  } else if (lang.includes('japanese')) {
+    return 'japanese';
+  } else if (lang.includes('greek')) {
+    return 'greek';
+  } else if (lang.includes('french')) {
+    return 'azerty';
+  } else {
+    return 'latin'; // Default to QWERTY
+  }
+};
 
 interface CardData {
   id: string;
@@ -29,6 +55,7 @@ interface CardData {
   status: string;
   reviewCount: number;
   correctCount: number;
+  streak?: number;
   nextReviewAt: string;
 }
 
@@ -39,6 +66,10 @@ export default function HomePage() {
   const [userAnswer, setUserAnswer] = useState('');
   const [originalWrongAnswer, setOriginalWrongAnswer] = useState('');
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<
+    'idle' | 'submitting' | 'success' | 'error'
+  >('idle');
+  const [showKeyboard, setShowKeyboard] = useState(false);
   const [loading, setLoading] = useState(true);
   const [reviewing, setReviewing] = useState(false);
   const [cardsQueue, setCardsQueue] = useState<CardData[]>([]);
@@ -117,6 +148,26 @@ export default function HomePage() {
     }
   }, [userAnswer, currentCard, showAnswer]);
 
+  // Handle virtual keyboard key press
+  const handleKeyboardKeyPress = (key: string) => {
+    if (reviewing) return;
+
+    if (key === 'Backspace') {
+      setUserAnswer((prev) => prev.slice(0, -1));
+    } else if (key === 'Enter') {
+      if (userAnswer.trim()) {
+        handleSubmitAnswer(new Event('submit') as any);
+      }
+    } else if (key === ' ' || key === 'Space') {
+      setUserAnswer((prev) => prev + ' ');
+    } else if (key === 'Tab') {
+      setUserAnswer((prev) => prev + '    '); // 4 spaces for tab
+    } else if (key.length === 1) {
+      // Regular character
+      setUserAnswer((prev) => prev + key);
+    }
+  };
+
   const checkAnswer = () => {
     if (!currentCard || !userAnswer.trim()) return;
 
@@ -144,7 +195,7 @@ export default function HomePage() {
     if (correct) {
       setTimeout(() => {
         proceedToNextCard();
-      }, 1500); // 1.5 second delay to show the green success screen
+      }, 300); // 1.5 second delay to show the green success screen
     }
   };
 
@@ -183,17 +234,80 @@ export default function HomePage() {
       // Determine quality based on correctness (4 = easy/correct, 2 = hard/incorrect)
       const quality = isCorrect ? 4 : 2;
 
-      // Submit review (optional - you can comment this out if not needed)
+      // Submit review with proper error handling
+      setReviewStatus('submitting');
+
       try {
-        await ReviewService.submitReview({
+        const reviewResponse = await ReviewService.submitReview({
           cardId: currentCard.card.id,
           quality,
         });
-      } catch (reviewError) {
-        console.warn(
-          'Failed to submit review, continuing anyway:',
-          reviewError
-        );
+
+        if (reviewResponse.success && reviewResponse.data) {
+          console.log('Review submitted successfully:', reviewResponse.data);
+          setReviewStatus('success');
+
+          // Debug logging
+          console.log('Current card before update:', currentCard);
+          console.log('Review response data:', reviewResponse.data);
+
+          // Update the current card with new review data
+          setCurrentCard((prev) => {
+            if (!prev || !reviewResponse.data) return prev;
+
+            const updated = {
+              ...prev,
+              status: reviewResponse.data.newStatus,
+              reviewCount: reviewResponse.data.reviewCount || prev.reviewCount,
+              correctCount:
+                reviewResponse.data.correctCount || prev.correctCount,
+              nextReviewAt: reviewResponse.data.nextReviewAt,
+            };
+
+            console.log('Updated card data:', updated);
+            return updated;
+          });
+        } else {
+          console.error('Review submission failed:', reviewResponse.message);
+          setReviewStatus('error');
+          alert(
+            'Warning: Review could not be saved. Your progress may not be tracked.'
+          );
+        }
+      } catch (reviewError: any) {
+        console.error('Failed to submit review:', reviewError);
+        setReviewStatus('error');
+
+        // Detailed error logging
+        console.error('Review error details:', {
+          status: reviewError.response?.status,
+          statusText: reviewError.response?.statusText,
+          data: reviewError.response?.data,
+          message: reviewError.message,
+          cardId: currentCard.card.id,
+          quality,
+        });
+
+        // Show user-friendly error message
+        const errorMessage =
+          reviewError.response?.data?.message ||
+          reviewError.message ||
+          'Unable to save your progress. Please check your connection.';
+
+        // Don't show alert for every error, just log it
+        console.warn(`Review submission failed: ${errorMessage}`);
+
+        // Only show critical errors to user
+        if (reviewError.response?.status === 401) {
+          alert('Your session has expired. Please log in again.');
+          navigate('/auth/login');
+          return;
+        } else if (reviewError.response?.status === 404) {
+          alert('Card not found. Skipping to next card.');
+        } else if (!navigator.onLine) {
+          console.warn('User is offline - review will be lost');
+          // Could implement offline storage here
+        }
       }
 
       // Update session stats
@@ -208,6 +322,7 @@ export default function HomePage() {
       setUserAnswer('');
       setOriginalWrongAnswer('');
       setIsCorrect(null);
+      setReviewStatus('idle');
 
       // Move to next card
       const nextIndex = currentIndex + 1;
@@ -235,7 +350,7 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className='min-h-screen flex items-center justify-center'>
+      <div className='w-full flex items-center justify-center'>
         <LoadingSpinner size='lg' />
       </div>
     );
@@ -294,17 +409,44 @@ export default function HomePage() {
                       onChange={(e) => setUserAnswer(e.target.value)}
                       placeholder='Type your answer here...'
                       className='w-full text-xl p-4 text-center border-2 border-gray-300 rounded-lg focus:border-blue-500'
-                      autoFocus
+                      autoFocus={!showKeyboard}
                       disabled={reviewing}
                     />
-                    {currentCard.card.backLanguage && (
-                      <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
+                    <div className='absolute right-12 top-1/2 transform -translate-y-1/2 flex items-center gap-2'>
+                      <button
+                        type='button'
+                        onClick={() => setShowKeyboard(!showKeyboard)}
+                        className={`p-2 rounded transition-colors ${
+                          showKeyboard
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                        }`}
+                        title='Toggle virtual keyboard'
+                      >
+                        <KeyboardIcon className='w-4 h-4' />
+                      </button>
+                      {currentCard.card.backLanguage && (
                         <span className='text-lg'>
                           {currentCard.card.backLanguage.flag}
                         </span>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
+
+                  {/* Virtual Keyboard */}
+                  {showKeyboard && (
+                    <div className='mt-4'>
+                      <Keyboard
+                        onKeyPress={handleKeyboardKeyPress}
+                        disabled={reviewing}
+                        currentAlphabet={getKeyboardLayout(
+                          currentCard.card.backLanguage?.name
+                        )}
+                        className='max-w-4xl mx-auto'
+                      />
+                    </div>
+                  )}
+
                   <Button
                     type='submit'
                     className='w-full text-lg py-3'
@@ -342,11 +484,22 @@ export default function HomePage() {
                     // Auto-advance for correct answers
                     <div className='text-center'>
                       <div className='text-green-600 text-lg font-medium mb-2'>
-                        Great job! Moving to next card...
+                        {reviewStatus === 'submitting' && 'Saving progress...'}
+                        {reviewStatus === 'success' &&
+                          'Progress saved! Moving to next card...'}
+                        {reviewStatus === 'error' &&
+                          'Great job! Moving to next card...'}
+                        {reviewStatus === 'idle' &&
+                          'Great job! Moving to next card...'}
                       </div>
                       <div className='animate-pulse'>
                         <LoadingSpinner size='sm' />
                       </div>
+                      {reviewStatus === 'error' && (
+                        <div className='text-orange-500 text-sm mt-2'>
+                          ⚠️ Progress not saved - check connection
+                        </div>
+                      )}
                     </div>
                   ) : (
                     // Require retyping for incorrect answers
@@ -361,9 +514,23 @@ export default function HomePage() {
                         onChange={(e) => setUserAnswer(e.target.value)}
                         placeholder='Type the correct answer...'
                         className='w-full text-xl p-4 text-center border-2 border-gray-300 rounded-lg focus:border-blue-500'
-                        autoFocus
+                        autoFocus={!showKeyboard}
                         disabled={reviewing}
                       />
+
+                      {/* Virtual Keyboard for retype phase */}
+                      {showKeyboard && (
+                        <div className='mt-4'>
+                          <Keyboard
+                            onKeyPress={handleKeyboardKeyPress}
+                            disabled={reviewing}
+                            currentAlphabet={getKeyboardLayout(
+                              currentCard.card.backLanguage?.name
+                            )}
+                            className='max-w-4xl mx-auto'
+                          />
+                        </div>
+                      )}
                       {userAnswer.toLowerCase().trim() ===
                         originalWrongAnswer.toLowerCase().trim() &&
                         userAnswer.trim() && (
