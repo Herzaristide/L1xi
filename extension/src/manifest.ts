@@ -69,11 +69,23 @@ const createBaseManifest = async (): Promise<Manifest> => {
                 48: './assets/icon-48.png',
                 128: './assets/icon-128.png'
             },
-            permissions: ['storage', 'activeTab', 'alarms', 'tabs'],
-            host_permissions: ['http://localhost:5000/*', 'http://localhost:3000/*'],
+            permissions: [
+                'storage',
+                'activeTab',
+                'alarms',
+                'tabs',
+                'contextMenus',
+                'notifications'
+            ],
+            host_permissions: [
+                'http://localhost:5000/*',
+                'http://localhost:3000/*',
+                'https://*/*',
+                'http://*/*'
+            ],
             content_scripts: [
                 {
-                    matches: ['http://localhost:3000/*'],
+                    matches: ['http://localhost:3000/*', 'https://*/*', 'http://*/*'],
                     js: ['./js/content.js']
                 }
             ],

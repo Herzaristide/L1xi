@@ -6,6 +6,7 @@ export { CardService } from './cardService';
 export { ReviewService } from './reviewService';
 export { StudyService } from './studyService';
 export { LanguageService } from './languageService';
+export { TTSService } from './ttsService';
 
 // Export types
 export * from './types';

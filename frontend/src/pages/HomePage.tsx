@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { ReviewService, CardService } from '@/lib/services';
 import type { Card as CardType } from '@/lib/services';
+import { useAuthStore } from '@/stores/authStore';
 
 // Study mode types
 type StudyMode = 'front-to-back' | 'back-to-front' | 'random';
@@ -70,6 +71,7 @@ interface CardData {
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { user, token, checkAuth } = useAuthStore();
   const [currentCard, setCurrentCard] = useState<CardData | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
   const [userAnswer, setUserAnswer] = useState('');
@@ -138,6 +140,14 @@ export default function HomePage() {
   const loadAllCards = async () => {
     try {
       setLoading(true);
+
+      // Check authentication first
+      if (!token) {
+        console.warn('No auth token found, redirecting to login');
+        navigate('/auth/login');
+        return;
+      }
+
       const response = await CardService.getMyCards({
         page: 1,
         limit: 1000,
@@ -190,8 +200,24 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    loadAllCards();
-  }, []);
+    // Check authentication status first
+    const initializeAuth = async () => {
+      if (!token) {
+        await checkAuth();
+      }
+
+      // If still no token after auth check, redirect to login
+      if (!token && !user) {
+        navigate('/auth/login');
+        return;
+      }
+
+      // Load cards if authenticated
+      loadAllCards();
+    };
+
+    initializeAuth();
+  }, [token, user, checkAuth, navigate]);
 
   // Real-time answer checking as user types
   useEffect(() => {
@@ -254,8 +280,26 @@ export default function HomePage() {
     if (correct) {
       setTimeout(() => {
         proceedToNextCard();
-      }, 300); // 1.5 second delay to show the green success screen
+      }, 300); // 300ms delay to show the green success screen
     }
+  };
+
+  // Function to highlight the correct answer based on user's mistakes
+  const getHighlightedAnswer = (userAnswer: string, correctAnswer: string) => {
+    const userChars = userAnswer.toLowerCase().split('');
+    const correctChars = correctAnswer.split('');
+
+    return correctChars.map((char, index) => {
+      const userChar = userChars[index];
+
+      if (!userChar || userChar !== char.toLowerCase()) {
+        // Character was missing or incorrect - highlight in red
+        return { char, shouldHighlight: true };
+      } else {
+        // Character was correct
+        return { char, shouldHighlight: false };
+      }
+    });
   };
 
   const handleSubmitAnswer = (e: React.FormEvent) => {
@@ -356,16 +400,26 @@ export default function HomePage() {
         // Don't show alert for every error, just log it
         console.warn(`Review submission failed: ${errorMessage}`);
 
-        // Only show critical errors to user
+        // Handle different error types gracefully
         if (reviewError.response?.status === 401) {
-          alert('Your session has expired. Please log in again.');
-          navigate('/auth/login');
-          return;
+          console.warn('Authentication error detected during review');
+          // Check if we can refresh the auth state
+          try {
+            await checkAuth();
+            // If auth check fails, show message but don't redirect mid-study
+            if (!token) {
+              alert(
+                'Your session has expired. Please save your progress and log in again.'
+              );
+            }
+          } catch (authError) {
+            console.error('Failed to refresh auth:', authError);
+          }
         } else if (reviewError.response?.status === 404) {
-          alert('Card not found. Skipping to next card.');
+          console.warn('Card not found, skipping to next card');
         } else if (!navigator.onLine) {
           console.warn('User is offline - review will be lost');
-          // Could implement offline storage here
+          alert('You appear to be offline. Your progress may not be saved.');
         }
       }
 
@@ -424,7 +478,7 @@ export default function HomePage() {
 
   if (!currentCard) {
     return (
-      <div className='h-full flex items-center justify-center'>
+      <div className='h-full w-full flex items-center justify-center'>
         <div className='text-center space-y-4'>
           <div className='w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center'>
             <Check className='w-8 h-8 text-green-600' />
@@ -510,15 +564,6 @@ export default function HomePage() {
           </div>
 
           <div className='bg-white rounded-lg p-8 min-h-[400px] flex flex-col justify-center'>
-            {/* Language Flag */}
-            {getQuestionAndAnswer().questionLanguage && (
-              <div className='flex justify-center mb-4'>
-                <span className='text-2xl'>
-                  {getQuestionAndAnswer().questionLanguage?.flag}
-                </span>
-              </div>
-            )}
-
             {/* Question Content */}
             <div className='text-center mb-8'>
               <h2 className='text-4xl font-bold text-gray-900 mb-4'>
@@ -532,6 +577,13 @@ export default function HomePage() {
                 // Input Phase
                 <form onSubmit={handleSubmitAnswer} className='space-y-4'>
                   <div className='flex gap-2'>
+                    <div className='flex'>
+                      {currentCard.card.backLanguage && (
+                        <span className='text-lg'>
+                          {currentCard.card.backLanguage.flag}
+                        </span>
+                      )}
+                    </div>
                     <Input
                       type='text'
                       value={userAnswer}
@@ -553,13 +605,6 @@ export default function HomePage() {
                     >
                       <KeyboardIcon className='w-4 h-4' />
                     </button>
-                    <div className='absolute right-12 top-1/2 transform -translate-y-1/2 flex items-center gap-2'>
-                      {currentCard.card.backLanguage && (
-                        <span className='text-lg'>
-                          {currentCard.card.backLanguage.flag}
-                        </span>
-                      )}
-                    </div>
                   </div>
 
                   {/* Virtual Keyboard */}
@@ -586,114 +631,46 @@ export default function HomePage() {
                 </form>
               ) : (
                 // Answer Display Phase
-                <div className='space-y-4'>
-                  <div
-                    className={`p-4 rounded-lg text-center text-xl ${
-                      isCorrect
-                        ? 'bg-green-100 text-green-800 border-2 border-green-300'
-                        : 'bg-red-100 text-red-800 border-2 border-red-300'
-                    }`}
-                  >
-                    <div className='font-bold mb-2'>
-                      {isCorrect ? '✓ Correct!' : '✗ Incorrect'}
-                    </div>
-                    <div>
-                      <span className='font-medium'>
-                        {cardDirection === 'front-to-back' ? 'Back' : 'Front'}:
-                      </span>
-                      <span className='font-bold ml-2'>
-                        {getQuestionAndAnswer().answer}
-                      </span>
-                    </div>
-                    {getQuestionAndAnswer().answerLanguage && (
-                      <div className='mt-2'>
-                        <span className='text-lg'>
-                          {getQuestionAndAnswer().answerLanguage?.flag}
-                        </span>
-                      </div>
-                    )}
-                    {!isCorrect && (
-                      <div className='mt-2 text-sm'>
-                        <span className='font-medium'>Your answer: </span>
-                        <span>{originalWrongAnswer}</span>
-                      </div>
-                    )}
+                <div className='w-full flex flex-col items-center space-y-4'>
+                  <div>
+                    <span className='font-bold text-lg'>
+                      {!isCorrect && originalWrongAnswer
+                        ? // Show highlighted answer for incorrect responses
+                          getHighlightedAnswer(
+                            originalWrongAnswer,
+                            getQuestionAndAnswer().answer
+                          ).map((item, index) => (
+                            <span
+                              key={index}
+                              className={
+                                item.shouldHighlight ? 'bg-red-500/50' : ''
+                              }
+                            >
+                              {item.char}
+                            </span>
+                          ))
+                        : // Show plain answer for correct responses
+                          getQuestionAndAnswer().answer}
+                    </span>
                   </div>
 
-                  {isCorrect ? (
-                    // Auto-advance for correct answers
-                    <div className='text-center'>
-                      <div className='text-green-600 text-lg font-medium mb-2'>
-                        {reviewStatus === 'submitting' && 'Saving progress...'}
-                        {reviewStatus === 'success' &&
-                          'Progress saved! Moving to next card...'}
-                        {reviewStatus === 'error' &&
-                          'Great job! Moving to next card...'}
-                        {reviewStatus === 'idle' &&
-                          'Great job! Moving to next card...'}
+                  {/* Show user's incorrect answer */}
+                  {!isCorrect && originalWrongAnswer && (
+                    <div className='p-3  rounded-lg text-center'>
+                      <div className='text-lg font-medium text-gray-700'>
+                        {originalWrongAnswer}
                       </div>
-                      <div className='animate-pulse'>
-                        <LoadingSpinner size='sm' />
-                      </div>
-                      {reviewStatus === 'error' && (
-                        <div className='text-orange-500 text-sm mt-2'>
-                          ⚠️ Progress not saved - check connection
-                        </div>
-                      )}
                     </div>
-                  ) : (
-                    // Require retyping for incorrect answers
-                    <form onSubmit={handleSubmitAnswer} className='space-y-4'>
-                      <div className='text-center text-gray-700 font-medium'>
-                        Please type the correct answer (different from your
-                        first attempt) to continue:
-                      </div>
-                      <Input
-                        type='text'
-                        value={userAnswer}
-                        onChange={(e) => setUserAnswer(e.target.value)}
-                        placeholder='Type the correct answer...'
-                        className='w-full text-xl p-4 text-center border-2 border-gray-300 rounded-lg focus:outline-none'
-                        autoFocus={!showKeyboard}
-                        disabled={reviewing}
-                      />
-
-                      {/* Virtual Keyboard for retype phase */}
-                      {showKeyboard && (
-                        <div className='mt-4'>
-                          <Keyboard
-                            onKeyPress={handleKeyboardKeyPress}
-                            disabled={reviewing}
-                            currentAlphabet={getKeyboardLayout(
-                              currentCard.card.backLanguage?.name
-                            )}
-                            className='max-w-4xl mx-auto'
-                          />
-                        </div>
-                      )}
-                      {userAnswer.toLowerCase().trim() ===
-                        originalWrongAnswer.toLowerCase().trim() &&
-                        userAnswer.trim() && (
-                          <div className='text-sm text-orange-600 text-center'>
-                            ⚠️ Please enter a different answer than your first
-                            attempt
-                          </div>
-                        )}
-                      <Button
-                        type='submit'
-                        className='w-full text-lg py-3'
-                        disabled={
-                          userAnswer.toLowerCase().trim() !==
-                            currentCard.card.back.toLowerCase().trim() ||
-                          userAnswer.toLowerCase().trim() ===
-                            originalWrongAnswer.toLowerCase().trim() ||
-                          reviewing
-                        }
-                      >
-                        {reviewing ? 'Processing...' : 'Continue'}
-                      </Button>
-                    </form>
                   )}
+
+                  {/* Next button for all cases */}
+                  <Button
+                    onClick={proceedToNextCard}
+                    className='w-full text-lg py-3'
+                    disabled={reviewing}
+                  >
+                    {reviewing ? 'Processing...' : 'Next Card'}
+                  </Button>
                 </div>
               )}
             </div>

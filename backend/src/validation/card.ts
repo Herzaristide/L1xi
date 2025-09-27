@@ -58,3 +58,27 @@ export const createBulkCardsSchema = Joi.array()
   .items(createCardSchema)
   .min(1)
   .max(100);
+
+// Schema for creating cards from selected text (browser extension)
+export const createCardFromTextSchema = Joi.object({
+  type: Joi.string()
+    .valid(
+      'TRANSLATION',
+      'DEFINITION',
+      'AUDIO_TEXT',
+      'IMAGE_TEXT',
+      'FILL_BLANK',
+      'MULTIPLE_CHOICE',
+      'GRAMMAR',
+      'CONVERSATION'
+    )
+    .default('TRANSLATION'),
+  front: Joi.string().min(1).max(1000).required(),
+  back: Joi.string().min(0).max(1000).default(''), // Allow empty back for extension
+  hint: Joi.string().max(500).optional(),
+  frontLanguageId: Joi.string().min(2).max(5).default('en'),
+  backLanguageId: Joi.string().min(2).max(5).optional(),
+  difficulty: Joi.number().integer().min(0).max(5).default(1),
+  tags: Joi.array().items(Joi.string().max(50)).optional(),
+  deckId: Joi.string().optional(),
+});

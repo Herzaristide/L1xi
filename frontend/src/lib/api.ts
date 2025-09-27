@@ -34,9 +34,18 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
+      // Token expired or invalid - clear storage but don't auto-redirect
+      // Let components handle auth failures contextually
       localStorage.removeItem('l1xi-auth-storage');
-      window.location.href = '/auth/login';
+      console.warn('Authentication token expired or invalid');
+
+      // Only auto-redirect if not on a study page or if explicitly requested
+      const currentPath = window.location.pathname;
+      const isStudyPage = currentPath === '/' || currentPath === '/study';
+
+      if (!isStudyPage) {
+        window.location.href = '/auth/login';
+      }
     }
     return Promise.reject(error);
   }

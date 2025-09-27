@@ -1,6 +1,17 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Grid3X3, Table, X } from 'lucide-react';
+import {
+  Grid3X3,
+  Table,
+  X,
+  Upload,
+  Check,
+  Square,
+  Archive,
+  Trash2,
+  RotateCcw,
+  CheckSquare,
+} from 'lucide-react';
 import { CardService, LanguageService } from '@/lib/services';
 import type { Card, Language } from '@/lib/services/types';
 import type { CreateCardRequest } from '@/lib/services';
@@ -8,6 +19,8 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { FlipCard } from '@/components/ui/FlipCard';
 import { useCardOperations } from '@/lib/hooks/useCardOperations';
 import { LanguageFlag } from '@/components/ui/LanguageFlag';
+import ImportCardsPopup from '@/components/ui/ImportCardsPopup';
+import { Button } from '@/components/ui/Button';
 
 export default function LibraryPage() {
   const [searchTerm, _setSearchTerm] = useState('');
@@ -41,6 +54,8 @@ export default function LibraryPage() {
     field: 'front' | 'back' | null;
     currentLanguageId: string | null;
   }>({ isOpen: false, cardId: null, field: null, currentLanguageId: null });
+  const [isImportPopupOpen, setIsImportPopupOpen] = useState(false);
+  const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
   const tableEndRef = useRef<HTMLDivElement>(null);
 
   const { archiveCard, deleteCard, updateCard } = useCardOperations();
@@ -280,6 +295,124 @@ export default function LibraryPage() {
     });
   };
 
+  // Handle card import
+  const handleImportCards = useCallback(
+    async (cardsData: any[]) => {
+      try {
+        // Use bulk create endpoint
+        await CardService.createCards(cardsData);
+
+        // Refresh the cards list
+        queryClient.invalidateQueries({ queryKey: ['cards'] });
+
+        // Show success message or notification
+        console.log(`Successfully imported ${cardsData.length} cards`);
+      } catch (error) {
+        console.error('Failed to import cards:', error);
+        throw error;
+      }
+    },
+    [queryClient]
+  );
+
+  // Selection handlers
+  const toggleCardSelection = (cardId: string) => {
+    const newSelected = new Set(selectedCards);
+    if (newSelected.has(cardId)) {
+      newSelected.delete(cardId);
+    } else {
+      newSelected.add(cardId);
+    }
+    setSelectedCards(newSelected);
+  };
+
+  const selectAllCards = () => {
+    if (selectedCards.size === cards.length) {
+      setSelectedCards(new Set());
+    } else {
+      setSelectedCards(new Set(cards.map((card) => card.id)));
+    }
+  };
+
+  // Bulk operations
+  const handleBulkDelete = async () => {
+    if (selectedCards.size === 0) return;
+
+    try {
+      const deletePromises = Array.from(selectedCards).map((cardId) =>
+        deleteCard(cardId)
+      );
+      await Promise.all(deletePromises);
+      setSelectedCards(new Set());
+    } catch (error) {
+      console.error('Failed to delete cards:', error);
+    }
+  };
+
+  const handleBulkArchive = async () => {
+    if (selectedCards.size === 0) return;
+
+    try {
+      const archivePromises = Array.from(selectedCards).map((cardId) =>
+        archiveCard(cardId)
+      );
+      await Promise.all(archivePromises);
+      setSelectedCards(new Set());
+    } catch (error) {
+      console.error('Failed to archive cards:', error);
+    }
+  };
+
+  const handleBulkFlip = async () => {
+    if (selectedCards.size === 0) return;
+
+    try {
+      const flipPromises = Array.from(selectedCards).map((cardId) => {
+        const card = cards.find((c) => c.id === cardId);
+        if (card) {
+          return updateCard(cardId, {
+            front: card.back,
+            back: card.front,
+            frontLanguageId: card.backLanguage?.id,
+            backLanguageId: card.frontLanguage?.id,
+          });
+        }
+        return Promise.resolve();
+      });
+      await Promise.all(flipPromises);
+      setSelectedCards(new Set());
+    } catch (error) {
+      console.error('Failed to flip cards:', error);
+    }
+  };
+
+  // Keyboard shortcuts for card selection
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle shortcuts when not typing in inputs
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        setSelectedCards(new Set());
+      } else if (event.ctrlKey || event.metaKey) {
+        switch (event.key) {
+          case 'a':
+            event.preventDefault();
+            selectAllCards();
+            break;
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectAllCards]);
+
   if (isLoading) {
     return (
       <div className='flex items-center justify-center min-h-[400px]'>
@@ -293,32 +426,120 @@ export default function LibraryPage() {
 
   return (
     <div className='w-full'>
-      {/* View Toggle Buttons */}
+      {/* Header with Action Bar, Import Button and View Toggle */}
       <div className='mb-6 flex justify-between items-center'>
         <h1 className='text-2xl font-bold text-gray-900'>Your Card Library</h1>
-        <div className='flex rounded-lg bg-gray-100 p-1'>
-          <button
-            onClick={() => setViewMode('cards')}
-            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-              viewMode === 'cards'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
+        <div className='flex items-center gap-4'>
+          {/* Action Bar - Visible when cards are selected */}
+          {selectedCards.size > 0 && (
+            <div className='flex items-center gap-3 px-4 py-2 bg-primary-50 border border-primary-200 rounded-lg shadow-sm'>
+              <div className='flex items-center gap-2'>
+                <CheckSquare className='h-4 w-4 text-primary-600' />
+                <span className='text-sm text-primary-700 font-medium'>
+                  {selectedCards.size} selected
+                </span>
+              </div>
+              <div className='w-px h-6 bg-primary-200'></div>
+              <div className='flex gap-1'>
+                <Button
+                  size='sm'
+                  variant='ghost'
+                  onClick={handleBulkDelete}
+                  className='text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5'
+                  title={`Delete ${selectedCards.size} selected card${
+                    selectedCards.size > 1 ? 's' : ''
+                  }`}
+                >
+                  <Trash2 className='h-4 w-4 mr-1' />
+                  Delete
+                </Button>
+                <Button
+                  size='sm'
+                  variant='ghost'
+                  onClick={handleBulkArchive}
+                  className='text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-3 py-1.5'
+                  title={`Archive ${selectedCards.size} selected card${
+                    selectedCards.size > 1 ? 's' : ''
+                  }`}
+                >
+                  <Archive className='h-4 w-4 mr-1' />
+                  Archive
+                </Button>
+                <Button
+                  size='sm'
+                  variant='ghost'
+                  onClick={handleBulkFlip}
+                  className='text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-1.5'
+                  title={`Flip ${selectedCards.size} selected card${
+                    selectedCards.size > 1 ? 's' : ''
+                  } (swap front/back)`}
+                >
+                  <RotateCcw className='h-4 w-4 mr-1' />
+                  Flip
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Import Button */}
+          <Button
+            onClick={() => setIsImportPopupOpen(true)}
+            variant='outline'
+            className='flex items-center gap-2'
           >
-            <Grid3X3 className='h-4 w-4' />
-            Cards
-          </button>
-          <button
-            onClick={() => setViewMode('table')}
-            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-              viewMode === 'table'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Table className='h-4 w-4' />
-            Table
-          </button>
+            <Upload className='h-4 w-4' />
+            Import Cards
+          </Button>
+
+          {/* View Toggle Buttons */}
+          <div className='flex items-center gap-2'>
+            {/* Select All Button - Always visible */}
+            <Button
+              onClick={selectAllCards}
+              variant='ghost'
+              size='sm'
+              className='text-sm'
+              title={
+                selectedCards.size === cards.length
+                  ? 'Deselect all'
+                  : 'Select all'
+              }
+            >
+              {selectedCards.size === cards.length ? (
+                <CheckSquare className='h-4 w-4 mr-1' />
+              ) : (
+                <Square className='h-4 w-4 mr-1' />
+              )}
+              {selectedCards.size === cards.length
+                ? 'Deselect All'
+                : 'Select All'}
+            </Button>
+
+            <div className='flex rounded-lg bg-gray-100 p-1'>
+              <button
+                onClick={() => setViewMode('cards')}
+                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  viewMode === 'cards'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Grid3X3 className='h-4 w-4' />
+                Cards
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  viewMode === 'table'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Table className='h-4 w-4' />
+                Table
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -334,15 +555,24 @@ export default function LibraryPage() {
       ) : viewMode === 'cards' ? (
         <div className='grid grid-cols-3 gap-6 w-full'>
           {cards.map((card: Card) => (
-            <FlipCard
-              key={card.id}
-              card={card}
-              onClick={() => console.log(`Studied card: ${card.front}`)}
-              onArchive={handleArchiveCard}
-              onDelete={handleDeleteCard}
-              onUpdate={handleUpdateCard}
-              className='transform hover:scale-105 transition-transform duration-200'
-            />
+            <div key={card.id} className='relative'>
+              <FlipCard
+                card={card}
+                onClick={() => {
+                  console.log(`Clicked card: ${card.front}`);
+                }}
+                onArchive={handleArchiveCard}
+                onDelete={handleDeleteCard}
+                onUpdate={handleUpdateCard}
+                isSelected={selectedCards.has(card.id)}
+                onToggleSelection={toggleCardSelection}
+                className={`transform hover:scale-105 transition-transform duration-200 ${
+                  selectedCards.has(card.id)
+                    ? 'ring-2 ring-primary-500 ring-offset-2'
+                    : ''
+                }`}
+              />
+            </div>
           ))}
         </div>
       ) : (
@@ -351,6 +581,22 @@ export default function LibraryPage() {
             <table className='min-w-full'>
               <thead className='bg-gray-50 sticky top-0 z-10'>
                 <tr>
+                  {/* Selection Column Header - Always visible */}
+                  <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 w-12'>
+                    <button
+                      onClick={selectAllCards}
+                      className='w-5 h-5 rounded border-2 border-gray-300 flex items-center justify-center hover:border-primary-400 transition-colors'
+                      title={
+                        selectedCards.size === cards.length
+                          ? 'Deselect all'
+                          : 'Select all'
+                      }
+                    >
+                      {selectedCards.size === cards.length && (
+                        <Check className='h-3 w-3 text-primary-600' />
+                      )}
+                    </button>
+                  </th>
                   <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 w-12'>
                     #
                   </th>
@@ -373,8 +619,22 @@ export default function LibraryPage() {
                 {cards.map((card: Card, index) => (
                   <tr
                     key={card.id}
-                    className='hover:bg-gray-50 border-b border-gray-100'
+                    className={`hover:bg-gray-50 border-b border-gray-100 ${
+                      selectedCards.has(card.id)
+                        ? 'bg-primary-50 hover:bg-primary-100'
+                        : ''
+                    }`}
                   >
+                    <td className='px-4 py-2 text-center border-r border-gray-200'>
+                      <button
+                        onClick={() => toggleCardSelection(card.id)}
+                        className='w-5 h-5 rounded border-2 border-gray-300 flex items-center justify-center hover:border-primary-400 transition-colors mx-auto'
+                      >
+                        {selectedCards.has(card.id) && (
+                          <Check className='h-3 w-3 text-primary-600' />
+                        )}
+                      </button>
+                    </td>
                     <td className='px-4 py-2 text-sm text-gray-500 border-r border-gray-200 bg-gray-50'>
                       {index + 1}
                     </td>
@@ -411,10 +671,7 @@ export default function LibraryPage() {
                               card.frontLanguage?.name || 'No language'
                             } - Click to change`}
                           >
-                            <LanguageFlag
-                              language={card.frontLanguage}
-                              size='sm'
-                            />
+                            <LanguageFlag language={card.frontLanguage} />
                           </button>
                         </div>
                       </div>
@@ -452,10 +709,7 @@ export default function LibraryPage() {
                               card.backLanguage?.name || 'No language'
                             } - Click to change`}
                           >
-                            <LanguageFlag
-                              language={card.backLanguage}
-                              size='sm'
-                            />
+                            <LanguageFlag language={card.backLanguage} />
                           </button>
                         </div>
                       </div>
@@ -469,6 +723,10 @@ export default function LibraryPage() {
                     key={row.id}
                     className='hover:bg-gray-50 border-b border-gray-100'
                   >
+                    {/* Selection Cell Placeholder for New Rows - Always visible */}
+                    <td className='px-4 py-2 text-center border-r border-gray-200'>
+                      {/* Empty cell for new rows */}
+                    </td>
                     <td className='px-4 py-2 text-sm text-gray-500 border-r border-gray-200 bg-gray-50'>
                       {cards.length + index + 1}
                     </td>
@@ -532,7 +790,6 @@ export default function LibraryPage() {
                                     )
                                   : undefined) || undefined
                               }
-                              size='sm'
                             />
                           </button>
                         </div>
@@ -598,7 +855,6 @@ export default function LibraryPage() {
                                     )
                                   : undefined) || undefined
                               }
-                              size='sm'
                             />
                           </button>
                         </div>
@@ -698,6 +954,13 @@ export default function LibraryPage() {
           </div>
         </div>
       )}
+
+      {/* Import Cards Popup */}
+      <ImportCardsPopup
+        isOpen={isImportPopupOpen}
+        onClose={() => setIsImportPopupOpen(false)}
+        onImport={handleImportCards}
+      />
     </div>
   );
 }

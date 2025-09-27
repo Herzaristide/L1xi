@@ -106,67 +106,6 @@ const KEYBOARD_LAYOUTS: Record<string, KeyboardLayout> = {
       ['Я', 'Ч', 'С', 'М', 'И', 'Т', 'Ь', 'Б', 'Ю', ','],
     ],
   },
-  chinese: {
-    name: 'Chinese (Pinyin)',
-    rows: [
-      ['`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='],
-      ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\\'],
-      ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', "'"],
-      ['z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/'],
-    ],
-    shiftRows: [
-      [
-        '~',
-        '！',
-        '＠',
-        '＃',
-        '￥',
-        '％',
-        '……',
-        '＆',
-        '＊',
-        '（',
-        '）',
-        '——',
-        '＋',
-      ],
-      ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '「', '」', '、'],
-      ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', '：', '"'],
-      ['Z', 'X', 'C', 'V', 'B', 'N', 'M', '《', '》', '？'],
-    ],
-    inputMethod: 'pinyin', // Special flag for input method
-  },
-  japanese: {
-    name: 'Japanese (Romaji)',
-    rows: [
-      ['`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='],
-      ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\\'],
-      ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', "'"],
-      ['z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/'],
-    ],
-    shiftRows: [
-      [
-        '～',
-        '！',
-        '＠',
-        '＃',
-        '＄',
-        '％',
-        '＾',
-        '＆',
-        '＊',
-        '（',
-        '）',
-        'ー',
-        '＋',
-      ],
-      ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '「', '」', '￥'],
-      ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', '：', '"'],
-      ['Z', 'X', 'C', 'V', 'B', 'N', 'M', '、', '。', '・'],
-    ],
-    inputMethod: 'romaji', // Special flag for input method
-    hiraganaMode: false, // Can be toggled
-  },
   greek: {
     name: 'Greek',
     rows: [
@@ -197,23 +136,22 @@ const SPECIAL_KEYS = {
   capslock: 'CapsLock',
 };
 
-// Input method helpers for Asian languages
+// Chinese Pinyin input suggestions (simplified for demo)
 const PINYIN_SUGGESTIONS: Record<string, string[]> = {
-  // Basic pinyin to Chinese character mappings (simplified examples)
-  ni: ['你', '尼', '泥'],
-  hao: ['好', '号', '毫'],
-  ma: ['吗', '马', '妈', '麻'],
-  shi: ['是', '十', '事', '时'],
-  wo: ['我', '窝', '握'],
-  de: ['的', '得', '地'],
-  le: ['了', '乐'],
-  zai: ['在', '再'],
-  you: ['有', '又', '右'],
-  bu: ['不', '步', '部'],
+  ni: ['你', '泥', '逆'],
+  hao: ['好', '号', '豪'],
+  ma: ['吗', '马', '妈'],
+  wo: ['我', '卧', '握'],
+  de: ['的', '得', '德'],
+  shi: ['是', '师', '时'],
+  zhe: ['这', '者', '着'],
+  ge: ['个', '各', '格'],
+  le: ['了', '乐', '勒'],
+  ta: ['他', '她', '它'],
 };
 
+// Japanese Romaji to Hiragana mapping (basic)
 const ROMAJI_TO_HIRAGANA: Record<string, string> = {
-  // Basic romaji to hiragana mappings
   a: 'あ',
   i: 'い',
   u: 'う',
@@ -225,13 +163,13 @@ const ROMAJI_TO_HIRAGANA: Record<string, string> = {
   ke: 'け',
   ko: 'こ',
   sa: 'さ',
-  shi: 'し',
+  si: 'し',
   su: 'す',
   se: 'せ',
   so: 'そ',
   ta: 'た',
-  chi: 'ち',
-  tsu: 'つ',
+  ti: 'ち',
+  tu: 'つ',
   te: 'て',
   to: 'と',
   na: 'な',
@@ -241,7 +179,7 @@ const ROMAJI_TO_HIRAGANA: Record<string, string> = {
   no: 'の',
   ha: 'は',
   hi: 'ひ',
-  fu: 'ふ',
+  hu: 'ふ',
   he: 'へ',
   ho: 'ほ',
   ma: 'ま',
@@ -564,35 +502,35 @@ export default function Keyboard({
     const isSpecialKey = Object.values(SPECIAL_KEYS).includes(key);
 
     let baseClass =
-      'keyboard-key flex items-center justify-center rounded border text-sm font-medium transition-all duration-75 select-none cursor-pointer ';
+      'keyboard-key flex items-center justify-center rounded-md border text-sm font-medium transition-all duration-150 select-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 font-sans ';
 
     if (disabled) {
       baseClass +=
         'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 border-gray-200 ';
     } else if (isActive) {
       baseClass +=
-        'bg-blue-500 text-white border-blue-600 shadow-lg transform scale-95 ';
+        'bg-primary-600 text-white border-primary-600 shadow-lg transform scale-95 ';
     } else if (isSpecialKey) {
       baseClass +=
-        'bg-gray-200 hover:bg-gray-300 text-gray-700 border-gray-300 ';
+        'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-300 shadow-sm ';
     } else {
       baseClass +=
-        'bg-white hover:bg-gray-50 text-gray-900 border-gray-300 shadow-sm ';
+        'bg-white hover:bg-gray-50 text-gray-900 border-gray-300 shadow-sm hover:border-gray-400 ';
     }
 
     // Size classes
     if (key === SPECIAL_KEYS.space) {
-      baseClass += 'h-12 flex-1 mx-2 ';
+      baseClass += 'h-11 flex-1 mx-2 ';
     } else if (
       key === SPECIAL_KEYS.shift ||
       key === SPECIAL_KEYS.enter ||
       key === SPECIAL_KEYS.backspace
     ) {
-      baseClass += 'h-12 px-4 ';
+      baseClass += 'h-11 px-4 min-w-[4rem] ';
     } else if (key === SPECIAL_KEYS.tab || key === SPECIAL_KEYS.capslock) {
-      baseClass += 'h-12 px-3 ';
+      baseClass += 'h-11 px-3 min-w-[3.5rem] ';
     } else {
-      baseClass += 'h-12 w-12 ';
+      baseClass += 'h-11 w-11 min-w-[2.75rem] ';
     }
 
     return baseClass;
@@ -600,10 +538,10 @@ export default function Keyboard({
 
   return (
     <div
-      className={`keyboard-container bg-gray-100 rounded-lg p-4 ${className}`}
+      className={`keyboard-container bg-white border border-gray-200 rounded-lg p-6 shadow-sm ${className}`}
     >
       {/* Alphabet Selector */}
-      <div className='mb-4 flex justify-center gap-2'>
+      <div className='mb-6 flex justify-center gap-2 flex-wrap'>
         {Object.entries(KEYBOARD_LAYOUTS).map(([key, layout]) => (
           <button
             key={key}
@@ -611,10 +549,10 @@ export default function Keyboard({
               handleAlphabetSwitch(key as keyof typeof KEYBOARD_LAYOUTS)
             }
             disabled={disabled}
-            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
               alphabet === key
-                ? 'bg-blue-500 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                ? 'bg-primary-600 text-white hover:bg-primary-700'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-300'
             } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           >
             {layout.name}
@@ -623,9 +561,9 @@ export default function Keyboard({
       </div>
 
       {/* Keyboard Layout */}
-      <div className='keyboard-layout space-y-2'>
+      <div className='keyboard-layout space-y-3'>
         {/* Number Row */}
-        <div className='keyboard-row flex gap-1 justify-center'>
+        <div className='keyboard-row flex gap-1.5 justify-center'>
           {displayRows[0].map((key, index) => (
             <button
               key={`num-${index}`}
@@ -653,7 +591,7 @@ export default function Keyboard({
         </div>
 
         {/* Top Letter Row */}
-        <div className='keyboard-row flex gap-1 justify-center'>
+        <div className='keyboard-row flex gap-1.5 justify-center'>
           <button
             onClick={() => handleVirtualKeyPress(SPECIAL_KEYS.tab)}
             disabled={disabled}
@@ -681,12 +619,14 @@ export default function Keyboard({
         </div>
 
         {/* Home Row */}
-        <div className='keyboard-row flex gap-1 justify-center'>
+        <div className='keyboard-row flex gap-1.5 justify-center'>
           <button
             onClick={() => handleVirtualKeyPress(SPECIAL_KEYS.capslock)}
             disabled={disabled}
             className={`${getKeyClass(SPECIAL_KEYS.capslock)} ${
-              isCapsLockOn ? 'bg-orange-400 text-white' : ''
+              isCapsLockOn
+                ? '!bg-warning-500 !text-white !border-warning-500'
+                : ''
             }`}
           >
             Caps
@@ -718,7 +658,7 @@ export default function Keyboard({
         </div>
 
         {/* Bottom Letter Row */}
-        <div className='keyboard-row flex gap-1 justify-center'>
+        <div className='keyboard-row flex gap-1.5 justify-center'>
           <button
             onClick={() => handleVirtualKeyPress(SPECIAL_KEYS.shift)}
             disabled={disabled}
@@ -749,7 +689,9 @@ export default function Keyboard({
             onClick={() => handleVirtualKeyPress(SPECIAL_KEYS.shift)}
             disabled={disabled}
             className={`${getKeyClass(SPECIAL_KEYS.shift)} ${
-              isShiftPressed ? 'bg-blue-400 text-white' : ''
+              isShiftPressed
+                ? '!bg-primary-500 !text-white !border-primary-500'
+                : ''
             }`}
           >
             Shift
@@ -757,7 +699,7 @@ export default function Keyboard({
         </div>
 
         {/* Space Bar Row */}
-        <div className='keyboard-row flex gap-1 justify-center'>
+        <div className='keyboard-row flex gap-1.5 justify-center'>
           <button
             onClick={() => handleVirtualKeyPress(SPECIAL_KEYS.ctrl)}
             disabled={disabled}
@@ -800,8 +742,8 @@ export default function Keyboard({
       {alphabet === 'chinese' &&
         showSuggestions &&
         currentSuggestions.length > 0 && (
-          <div className='mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200'>
-            <div className='text-sm text-gray-700 mb-2'>
+          <div className='mt-6 p-4 bg-warning-50 rounded-lg border border-warning-200'>
+            <div className='text-sm text-gray-700 mb-3'>
               Pinyin:{' '}
               <span className='font-mono font-semibold'>{pinyinBuffer}</span>
             </div>
@@ -815,7 +757,7 @@ export default function Keyboard({
                     setShowSuggestions(false);
                     setCurrentSuggestions([]);
                   }}
-                  className='px-3 py-1 bg-white border border-gray-300 rounded hover:bg-blue-50 hover:border-blue-300 text-lg'
+                  className='px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-primary-50 hover:border-primary-300 text-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2'
                   disabled={disabled}
                 >
                   {index + 1}. {suggestion}
@@ -830,14 +772,14 @@ export default function Keyboard({
 
       {/* Japanese Input Method Controls */}
       {alphabet === 'japanese' && (
-        <div className='mt-4 flex justify-center'>
+        <div className='mt-6 flex justify-center'>
           <button
             onClick={() => setIsHiraganaMode(!isHiraganaMode)}
             disabled={disabled}
-            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
               isHiraganaMode
-                ? 'bg-green-500 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                ? 'bg-success-500 text-white hover:bg-success-600'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
             } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           >
             {isHiraganaMode ? 'ひらがな (ON)' : 'Romaji (OFF)'}
@@ -846,33 +788,39 @@ export default function Keyboard({
       )}
 
       {/* Status Indicators */}
-      <div className='mt-4 flex justify-center gap-4 text-xs text-gray-600 flex-wrap'>
+      <div className='mt-6 flex justify-center gap-3 text-xs text-gray-600 flex-wrap'>
         <span
-          className={`px-2 py-1 rounded ${
-            isCapsLockOn ? 'bg-orange-100 text-orange-700' : 'bg-gray-200'
+          className={`px-3 py-1.5 rounded-full font-medium ${
+            isCapsLockOn
+              ? 'bg-warning-100 text-warning-700 border border-warning-200'
+              : 'bg-gray-100 text-gray-600 border border-gray-200'
           }`}
         >
           Caps Lock {isCapsLockOn ? 'ON' : 'OFF'}
         </span>
         <span
-          className={`px-2 py-1 rounded ${
-            isShiftPressed ? 'bg-blue-100 text-blue-700' : 'bg-gray-200'
+          className={`px-3 py-1.5 rounded-full font-medium ${
+            isShiftPressed
+              ? 'bg-primary-100 text-primary-700 border border-primary-200'
+              : 'bg-gray-100 text-gray-600 border border-gray-200'
           }`}
         >
           Shift {isShiftPressed ? 'ON' : 'OFF'}
         </span>
-        <span className='px-2 py-1 rounded bg-gray-200'>
+        <span className='px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200 font-medium'>
           Layout: {currentLayout.name}
         </span>
         {alphabet === 'chinese' && (
-          <span className='px-2 py-1 rounded bg-purple-100 text-purple-700'>
+          <span className='px-3 py-1.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 font-medium'>
             Pinyin Mode
           </span>
         )}
         {alphabet === 'japanese' && (
           <span
-            className={`px-2 py-1 rounded ${
-              isHiraganaMode ? 'bg-green-100 text-green-700' : 'bg-gray-200'
+            className={`px-3 py-1.5 rounded-full font-medium ${
+              isHiraganaMode
+                ? 'bg-success-100 text-success-700 border border-success-200'
+                : 'bg-gray-100 text-gray-600 border border-gray-200'
             }`}
           >
             {isHiraganaMode ? 'ひらがな' : 'Romaji'}

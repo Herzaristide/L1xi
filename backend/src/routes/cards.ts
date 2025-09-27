@@ -5,6 +5,7 @@ import {
   createCardSchema,
   updateCardSchema,
   createBulkCardsSchema,
+  createCardFromTextSchema,
 } from '../validation/card';
 
 const router = express.Router();
@@ -576,6 +577,74 @@ router.get('/review/due', authenticate, async (req: AuthRequest, res) => {
     });
   } catch (error) {
     console.error('Get due cards error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+});
+
+// Create a card from selected text (for browser extension)
+router.post('/from-text', authenticate, async (req: AuthRequest, res) => {
+  try {
+    // Validate the request body
+    const { error, value } = createCardFromTextSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: error.details,
+      });
+    }
+
+    const userId = req.user!.id;
+    const cardData = value; // Use validated data
+
+    // If deckId is provided, check if it exists and belongs to user
+    if (cardData.deckId) {
+      const deck = await prisma.deck.findFirst({
+        where: {
+          id: cardData.deckId,
+          ownerId: userId,
+        },
+      });
+
+      if (!deck) {
+        return res.status(404).json({
+          success: false,
+          message:
+            'Deck not found or you do not have permission to add cards to it',
+        });
+      }
+    }
+
+    // Create the card
+    const card = await prisma.card.create({
+      data: {
+        ...cardData,
+        ownerId: userId,
+        type: cardData.type || 'TRANSLATION', // Default type
+      },
+      include: {
+        frontLanguage: true,
+        backLanguage: true,
+        owner: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Card created successfully from selected text',
+      data: card,
+    });
+  } catch (error) {
+    console.error('Error creating card from text:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',

@@ -1,8 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card as CardType } from '@/lib/services/types';
-import { Volume2, RotateCcw, Archive, Trash2, TrendingUp } from 'lucide-react';
+import {
+  Volume2,
+  RotateCcw,
+  Archive,
+  Trash2,
+  TrendingUp,
+  Check,
+} from 'lucide-react';
 import { LanguageFlag } from './LanguageFlag';
-import { CardService } from '@/lib/services';
+import { CardService, TTSService } from '@/lib/services';
 
 // FlipCard Component Interface
 interface FlipCardProps {
@@ -12,6 +19,9 @@ interface FlipCardProps {
   onArchive?: (cardId: string) => void;
   onDelete?: (cardId: string) => void;
   onUpdate?: (cardId: string, updatedCard: Partial<CardType>) => void;
+  // Selection props
+  isSelected?: boolean;
+  onToggleSelection?: (cardId: string) => void;
 }
 
 // Card Statistics Interface
@@ -33,6 +43,8 @@ function FlipCard({
   onArchive,
   onDelete,
   onUpdate,
+  isSelected = false,
+  onToggleSelection,
 }: FlipCardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isShowingStats, setIsShowingStats] = useState(false);
@@ -44,6 +56,22 @@ function FlipCard({
   const frontTextareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimeoutRef = useRef<number | null>(null);
   const frontSaveTimeoutRef = useRef<number | null>(null);
+  const [playingTTS, setPlayingTTS] = useState<'front' | 'back' | null>(null);
+
+  // Handle TTS playback
+  const handlePlayTTS = async (side: 'front' | 'back') => {
+    if (playingTTS) return; // Prevent multiple simultaneous playbacks
+
+    try {
+      setPlayingTTS(side);
+      await TTSService.playCardTTS(card.id, side);
+    } catch (error) {
+      console.error('Failed to play TTS:', error);
+      // Could show a toast notification here
+    } finally {
+      setPlayingTTS(null);
+    }
+  };
 
   // Calculate dynamic rows based on content
   const calculateRows = (text: string) => {
@@ -52,6 +80,26 @@ function FlipCard({
     const estimatedLines = Math.ceil(text.length / charsPerLine);
     return Math.max(1, Math.max(lines, estimatedLines));
   };
+
+  // Auto-resize textarea function
+  const autoResizeTextarea = (textarea: HTMLTextAreaElement) => {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  };
+
+  // Auto-resize front textarea when content changes
+  useEffect(() => {
+    if (frontTextareaRef.current) {
+      autoResizeTextarea(frontTextareaRef.current);
+    }
+  }, [frontEditText]);
+
+  // Auto-resize back textarea when content changes
+  useEffect(() => {
+    if (textareaRef.current) {
+      autoResizeTextarea(textareaRef.current);
+    }
+  }, [editText]);
 
   // Auto-save functionality with debounce for back
   const autoSave = async (text: string) => {
@@ -402,18 +450,46 @@ function FlipCard({
               {/* Header */}
               <div className='flex justify-between items-start mb-4'>
                 <div className='flex items-center gap-2'>
-                  <LanguageFlag language={card.frontLanguage} size='sm' />
+                  {/* Selection Checkbox */}
+                  {onToggleSelection && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleSelection(card.id);
+                      }}
+                      className='w-5 h-5 rounded bg-white shadow-sm border-2 border-gray-200 flex items-center justify-center hover:border-primary-400 transition-colors'
+                      title={isSelected ? 'Deselect card' : 'Select card'}
+                    >
+                      {isSelected && (
+                        <Check className='h-3 w-3 text-primary-600' />
+                      )}
+                    </button>
+                  )}
+                  <LanguageFlag language={card.frontLanguage} />
                 </div>
                 <div className='flex items-center space-x-2'>
                   <button
-                    className='p-1 hover:bg-gray-100 rounded transition-colors'
+                    className={`p-1 hover:bg-gray-100 rounded transition-colors ${
+                      playingTTS === 'front' ? 'bg-blue-100 text-blue-600' : ''
+                    }`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Add audio playback functionality here
+                      handlePlayTTS('front');
                     }}
-                    title='Play pronunciation'
+                    disabled={playingTTS !== null}
+                    title={
+                      playingTTS === 'front'
+                        ? 'Playing...'
+                        : 'Play pronunciation'
+                    }
                   >
-                    <Volume2 className='h-4 w-4 text-gray-600' />
+                    <Volume2
+                      className={`h-4 w-4 ${
+                        playingTTS === 'front'
+                          ? 'text-blue-600'
+                          : 'text-gray-600'
+                      }`}
+                    />
                   </button>
                   <button
                     className={`p-1 hover:bg-gray-100 rounded transition-colors ${
@@ -464,12 +540,17 @@ function FlipCard({
                     <textarea
                       ref={frontTextareaRef}
                       value={frontEditText}
-                      onChange={(e) => handleFrontTextChange(e.target.value)}
-                      className='w-full text-2xl font-semibold text-gray-900 mb-2 break-words resize-none text-center focus:outline-none border-none bg-transparent overflow-hidden'
-                      rows={calculateRows(frontEditText)}
+                      onChange={(e) => {
+                        handleFrontTextChange(e.target.value);
+                        autoResizeTextarea(e.target);
+                      }}
+                      className='w-full text-2xl font-semibold text-gray-900 mb-2 break-words resize-none text-center focus:outline-none border-none bg-transparent overflow-hidden min-h-[2.5rem]'
                       placeholder='Enter card front text...'
                       title='Edit card front text'
                       onClick={(e) => e.stopPropagation()}
+                      onInput={(e) =>
+                        autoResizeTextarea(e.target as HTMLTextAreaElement)
+                      }
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
@@ -497,20 +578,48 @@ function FlipCard({
               {/* Header */}
               <div className='flex justify-between items-start mb-4'>
                 <div className='flex items-center gap-2'>
+                  {/* Selection Checkbox */}
+                  {onToggleSelection && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleSelection(card.id);
+                      }}
+                      className='w-5 h-5 rounded bg-white shadow-sm border-2 border-gray-200 flex items-center justify-center hover:border-primary-400 transition-colors'
+                      title={isSelected ? 'Deselect card' : 'Select card'}
+                    >
+                      {isSelected && (
+                        <Check className='h-3 w-3 text-primary-600' />
+                      )}
+                    </button>
+                  )}
                   {card.backLanguage && (
                     <LanguageFlag language={card.backLanguage} size='sm' />
                   )}
                 </div>
                 <div className='flex items-center space-x-2'>
                   <button
-                    className='p-1 hover:bg-blue-100 rounded transition-colors'
+                    className={`p-1 hover:bg-blue-100 rounded transition-colors ${
+                      playingTTS === 'back' ? 'bg-blue-200 text-blue-700' : ''
+                    }`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Add audio playback functionality here
+                      handlePlayTTS('back');
                     }}
-                    title='Play pronunciation'
+                    disabled={playingTTS !== null}
+                    title={
+                      playingTTS === 'back'
+                        ? 'Playing...'
+                        : 'Play pronunciation'
+                    }
                   >
-                    <Volume2 className='h-4 w-4 text-blue-600' />
+                    <Volume2
+                      className={`h-4 w-4 ${
+                        playingTTS === 'back'
+                          ? 'text-blue-700'
+                          : 'text-blue-600'
+                      }`}
+                    />
                   </button>
                   <button
                     className={`p-1 hover:bg-blue-100 rounded transition-colors ${
@@ -561,12 +670,17 @@ function FlipCard({
                     <textarea
                       ref={textareaRef}
                       value={editText}
-                      onChange={(e) => handleTextChange(e.target.value)}
-                      className='w-full text-2xl font-semibold text-gray-900 mb-2 break-words resize-none text-center focus:outline-none border-none bg-transparent overflow-hidden'
-                      rows={calculateRows(editText)}
+                      onChange={(e) => {
+                        handleTextChange(e.target.value);
+                        autoResizeTextarea(e.target);
+                      }}
+                      className='w-full text-2xl font-semibold text-gray-900 mb-2 break-words resize-none text-center focus:outline-none border-none bg-transparent overflow-hidden min-h-[2.5rem]'
                       placeholder='Enter card back text...'
                       title='Edit card back text'
                       onClick={(e) => e.stopPropagation()}
+                      onInput={(e) =>
+                        autoResizeTextarea(e.target as HTMLTextAreaElement)
+                      }
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();

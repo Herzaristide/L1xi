@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { browser } from 'webextension-polyfill-ts'
+import { CardService } from '../../services/cardService'
 
 const App = () => {
     const [isVisible, setIsVisible] = useState(false)
@@ -34,6 +35,46 @@ const App = () => {
                 case 'PING':
                     sendResponse({ success: true, message: 'Content script is active' })
                     break
+
+                case 'CREATE_CARD_FROM_TEXT':
+                    try {
+                        console.log('[ContentScript] Creating card from text:', message.data)
+
+                        // Create the card using the CardService
+                        const card = await CardService.createCardFromText({
+                            selectedText: message.data.selectedText,
+                            sourceUrl: message.data.sourceUrl,
+                            sourceTitle: message.data.sourceTitle,
+                            frontLanguageId: 'en', // Could be detected from page lang
+                            backLanguageId: undefined // User will set this
+                        })
+
+                        sendResponse({
+                            success: true,
+                            card: card,
+                            message: 'Card created successfully'
+                        })
+                    } catch (error) {
+                        console.error('[ContentScript] Error creating card:', error)
+
+                        let errorMessage = 'Failed to create card'
+                        if (error instanceof Error) {
+                            if (error.message.includes('Authentication required')) {
+                                errorMessage = 'Please log in to L1xi first'
+                            } else if (error.message.includes('fetch')) {
+                                errorMessage =
+                                    'Connection error. Please check your internet connection'
+                            } else {
+                                errorMessage = error.message
+                            }
+                        }
+
+                        sendResponse({
+                            success: false,
+                            error: errorMessage
+                        })
+                    }
+                    return true // Keep message channel open for async response
 
                 case 'clicked_browser_action':
                     console.log('[ContentScript] Browser action clicked')

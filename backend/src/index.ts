@@ -14,6 +14,7 @@ import deckRoutes from './routes/decks';
 import cardRoutes from './routes/cards';
 import reviewRoutes from './routes/reviews';
 import studyRoutes from './routes/study';
+import ttsRoutes from './routes/tts';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -81,6 +82,7 @@ app.use('/api/decks', deckRoutes);
 app.use('/api/cards', cardRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/study', studyRoutes);
+app.use('/api/tts', ttsRoutes);
 
 // Error handling middleware
 app.use(notFound);

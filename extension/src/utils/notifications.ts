@@ -14,15 +14,33 @@ export class NotificationService {
     static show(options: NotificationOptions): void {
         const { title, message, type } = options
 
-        // For extension environment, we'll use console logging
-        // In a full implementation, this could show browser notifications
-        // or in-popup notifications
-
         const emoji = this.getEmojiForType(type)
         console.log(`${emoji} ${title}: ${message}`)
 
-        // Could also use browser notifications API if permission is granted
-        // this.showBrowserNotification(options);
+        // Use Chrome extension notifications if available
+        this.showChromeNotification(options)
+    }
+
+    /**
+     * Show Chrome extension notification
+     */
+    static showChromeNotification(options: NotificationOptions): void {
+        if (typeof chrome !== 'undefined' && chrome.notifications) {
+            chrome.notifications.create({
+                type: 'basic',
+                iconUrl: 'assets/icon-48.png',
+                title: options.title,
+                message: options.message
+            })
+        }
+    }
+
+    /**
+     * Truncate text for notification display
+     */
+    static truncateText(text: string, maxLength: number = 50): string {
+        if (text.length <= maxLength) return text
+        return text.slice(0, maxLength) + '...'
     }
 
     /**
