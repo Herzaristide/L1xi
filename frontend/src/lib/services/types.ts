@@ -80,6 +80,7 @@ export interface Card {
   deck?: Deck;
   frontLanguage?: Language;
   backLanguage?: Language;
+  isArchived?: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,5 +1,12 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Brain, BookOpen, BarChart3, Settings, CreditCard } from 'lucide-react';
+import {
+  Brain,
+  BookOpen,
+  BarChart3,
+  Settings,
+  CreditCard,
+  Archive,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {}
@@ -7,6 +14,7 @@ interface SidebarProps {}
 const navigation = [
   { name: 'Home', href: '/', icon: Brain },
   { name: 'Library', href: '/library', icon: CreditCard },
+  { name: 'Archive', href: '/archive', icon: Archive },
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
   { name: 'Decks', href: '/decks', icon: BookOpen },
   { name: 'Profile', href: '/profile', icon: Settings },

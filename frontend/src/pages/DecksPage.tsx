@@ -20,7 +20,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/FlipCard';
+} from '@/components/ui/FlipCardold';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { formatDate, getRandomColor } from '@/lib/utils';
 import toast from 'react-hot-toast';

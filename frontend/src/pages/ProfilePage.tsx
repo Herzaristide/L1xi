@@ -8,7 +8,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/FlipCard';
+} from '@/components/ui/FlipCardold';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import {

@@ -7,7 +7,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/FlipCard';
+} from '@/components/ui/FlipCardold';
 import { Button } from '@/components/ui/Button';
 import {
   BookOpen,

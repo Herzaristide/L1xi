@@ -1,13 +1,12 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { useEffect } from 'react';
-import AuthLayout from '@/components/layouts/AuthLayout';
-import MainLayout from '@/components/layouts/MainLayout';
 import LoginPage from '@/pages/auth/LoginPage';
 import RegisterPage from '@/pages/auth/RegisterPage';
 import StudyPage from '@/pages/HomePage';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import LibraryPage from '@/pages/LibraryPage';
+import ArchivePage from '@/pages/ArchivePage';
 import Sidebar from '@/components/navigation/Sidebar';
 import ProfilePage from '@/pages/ProfilePage';
 
@@ -40,6 +39,7 @@ function App() {
           <>
             <Route path='/' index element={<StudyPage />} />
             <Route path='library' element={<LibraryPage />} />
+            <Route path='archive' element={<ArchivePage />} />
             <Route path='profile' element={<ProfilePage />} />
             <Route path='/auth/*' element={<Navigate to='/' replace />} />
           </>

@@ -10,7 +10,6 @@ interface LanguageFlagProps {
 export function LanguageFlag({
   language,
   className = '',
-  showName = false,
   size = 'sm',
 }: LanguageFlagProps) {
   if (!language) {
@@ -31,14 +30,6 @@ export function LanguageFlag({
       {language.flag && (
         <span className='text-sm' role='img' aria-label={language.name}>
           {language.flag}
-        </span>
-      )}
-      {showName && (
-        <span className='font-medium text-gray-700'>{language.name}</span>
-      )}
-      {!showName && (
-        <span className='font-medium text-gray-700 uppercase text-xs'>
-          {language.id}
         </span>
       )}
     </div>

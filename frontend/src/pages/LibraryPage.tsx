@@ -1,33 +1,37 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, Search, Filter, X, Plus } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { CardService, DeckService, LanguageService } from '@/lib/services';
+import { Grid3X3, Table } from 'lucide-react';
+import { CardService } from '@/lib/services';
 import type { Card } from '@/lib/services/types';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import type { CreateCardRequest } from '@/lib/services';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { FlipCard } from '@/components/ui/FlipCard';
-import { LanguageFlag } from '@/components/ui/LanguageFlag';
+import { useCardOperations } from '@/lib/hooks/useCardOperations';
 
 export default function LibraryPage() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedType, setSelectedType] = useState<string>('');
-  const [selectedDifficulty, setSelectedDifficulty] = useState<number | ''>('');
-  const [selectedFrontLanguage, setSelectedFrontLanguage] =
+  const [searchTerm, _setSearchTerm] = useState('');
+  const [selectedType, _setSelectedType] = useState<string>('');
+  const [selectedDifficulty, _setSelectedDifficulty] = useState<number | ''>(
+    ''
+  );
+  const [selectedFrontLanguage, _setSelectedFrontLanguage] =
     useState<string>('');
-  const [selectedBackLanguage, setSelectedBackLanguage] = useState<string>('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showFilters, setShowFilters] = useState(false);
-  const [createFormData, setCreateFormData] = useState({
-    deckId: '',
-    type: 'flashcard',
-    front: '',
-    back: '',
-    hint: '',
-    difficulty: 1,
-    tags: '',
-  });
+  const [selectedBackLanguage, _setSelectedBackLanguage] = useState<string>('');
+  const [currentPage, _setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [editingCells, setEditingCells] = useState<{ [key: string]: string }>(
+    {}
+  );
+  const [newRows, setNewRows] = useState<
+    Array<{ front: string; back: string; id: string }>
+  >([]);
+  const [saveTimeouts, setSaveTimeouts] = useState<{ [key: string]: number }>(
+    {}
+  );
+  const tableEndRef = useRef<HTMLDivElement>(null);
+
+  const { archiveCard, deleteCard, updateCard } = useCardOperations();
+  const queryClient = useQueryClient();
 
   const { data: cardsResponse, isLoading } = useQuery({
     queryKey: [
@@ -56,18 +60,133 @@ export default function LibraryPage() {
     },
   });
 
-  // Fetch available languages for filters
-  const { data: languagesResponse } = useQuery({
-    queryKey: ['languages'],
-    queryFn: async () => {
-      const response = await LanguageService.getLanguages();
-      return response.success ? response.data : null;
+  const cards = cardsResponse?.items || [];
+
+  // Excel-like table functionality
+  const generateEmptyRows = (count: number = 10) => {
+    return Array.from({ length: count }, (_, index) => ({
+      id: `new-${Date.now()}-${index}`,
+      front: '',
+      back: '',
+    }));
+  };
+
+  // Initialize empty rows if needed
+  const ensureEmptyRows = () => {
+    if (newRows.length < 5) {
+      setNewRows((prev) => [...prev, ...generateEmptyRows(10)]);
+    }
+  };
+
+  // Auto-save functionality for cells
+  const autoSaveCell = useCallback(
+    async (cardId: string, field: 'front' | 'back', value: string) => {
+      if (!value.trim()) return;
+
+      try {
+        if (cardId.startsWith('new-')) {
+          // Check if both front and back have content for new cards
+          const currentRow = newRows.find((row) => row.id === cardId);
+          if (!currentRow) return;
+
+          const updatedRow = { ...currentRow, [field]: value };
+          if (updatedRow.front.trim() && updatedRow.back.trim()) {
+            // Create new card
+            const newCard: CreateCardRequest = {
+              type: 'TRANSLATION',
+              front: updatedRow.front.trim(),
+              back: updatedRow.back.trim(),
+            };
+
+            const response = await CardService.createCard(newCard);
+            if (response.success) {
+              // Remove from newRows and refresh cards list
+              setNewRows((prev) => prev.filter((row) => row.id !== cardId));
+              // Invalidate queries to refresh the cards list
+              queryClient.invalidateQueries({ queryKey: ['my-cards'] });
+            }
+          } else {
+            // Update the temporary row
+            setNewRows((prev) =>
+              prev.map((row) => (row.id === cardId ? updatedRow : row))
+            );
+          }
+        } else {
+          // Update existing card
+          await updateCard(cardId, { [field]: value.trim() });
+        }
+      } catch (error) {
+        console.error('Error saving cell:', error);
+      }
     },
+    [newRows, updateCard]
+  );
+
+  // Handle cell change with debounce
+  const handleCellChange = (
+    cardId: string,
+    field: 'front' | 'back',
+    value: string
+  ) => {
+    const cellKey = `${cardId}-${field}`;
+
+    // Update editing state
+    setEditingCells((prev) => ({ ...prev, [cellKey]: value }));
+
+    // Clear existing timeout
+    if (saveTimeouts[cellKey]) {
+      clearTimeout(saveTimeouts[cellKey]);
+    }
+
+    // Set new timeout for auto-save
+    const timeoutId = setTimeout(() => {
+      autoSaveCell(cardId, field, value);
+    }, 500) as unknown as number;
+
+    setSaveTimeouts((prev) => ({ ...prev, [cellKey]: timeoutId }));
+  };
+
+  // Get cell value (from editing state or card data)
+  const getCellValue = (cardId: string, field: 'front' | 'back') => {
+    const cellKey = `${cardId}-${field}`;
+    if (editingCells[cellKey] !== undefined) {
+      return editingCells[cellKey];
+    }
+
+    if (cardId.startsWith('new-')) {
+      const row = newRows.find((r) => r.id === cardId);
+      return row?.[field] || '';
+    }
+
+    const card = cards.find((c) => c.id === cardId);
+    return card?.[field] || '';
+  };
+
+  // Initialize empty rows
+  useState(() => {
+    setNewRows(generateEmptyRows(15));
   });
 
-  const cards = cardsResponse?.items || [];
-  const pagination = cardsResponse?.pagination;
-  const languages = languagesResponse?.languages || [];
+  // Archive/Unarchive handler
+  const handleArchiveCard = async (cardId: string) => {
+    const card = cards.find((c) => c.id === cardId);
+    if (!card) return;
+
+    await archiveCard(cardId, card.isArchived);
+  };
+
+  // Delete handler
+  const handleDeleteCard = async (cardId: string) => {
+    await deleteCard(cardId);
+  };
+
+  // Update handler
+  const handleUpdateCard = async (
+    cardId: string,
+    updatedData: Partial<Card>
+  ) => {
+    await updateCard(cardId, updatedData);
+  };
 
   if (isLoading) {
     return (
@@ -81,213 +200,192 @@ export default function LibraryPage() {
   }
 
   return (
-    <div className='space-y-6'>
-      {/* Search and Filters */}
-      <div className='bg-white rounded-lg shadow-sm border p-6'>
-        <div className='space-y-4'>
-          {/* Search Bar */}
-          <div className='flex items-center space-x-4'>
-            <div className='flex-1 relative'>
-              <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4' />
-              <Input
-                placeholder='Search cards...'
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className='pl-10'
-              />
-            </div>
-            <Button
-              variant='outline'
-              onClick={() => setShowFilters(!showFilters)}
-              className='flex items-center space-x-2'
-            >
-              <Filter className='h-4 w-4' />
-              <span>Filters</span>
-            </Button>
-          </div>
-
-          {/* Filter Options */}
-          {showFilters && (
-            <div className='grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t'>
-              {/* Card Type Filter */}
-              <div>
-                <label className='block text-sm font-medium text-gray-700 mb-1'>
-                  Card Type
-                </label>
-                <select
-                  value={selectedType}
-                  onChange={(e) => setSelectedType(e.target.value)}
-                  className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
-                >
-                  <option value=''>All Types</option>
-                  <option value='TRANSLATION'>Translation</option>
-                  <option value='MULTIPLE_CHOICE'>Multiple Choice</option>
-                  <option value='DEFINITION'>Definition</option>
-                  <option value='GRAMMAR'>Grammar</option>
-                </select>
-              </div>
-
-              {/* Difficulty Filter */}
-              <div>
-                <label className='block text-sm font-medium text-gray-700 mb-1'>
-                  Difficulty
-                </label>
-                <select
-                  value={selectedDifficulty}
-                  onChange={(e) =>
-                    setSelectedDifficulty(
-                      e.target.value === '' ? '' : Number(e.target.value)
-                    )
-                  }
-                  className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
-                >
-                  <option value=''>All Levels</option>
-                  <option value={1}>Beginner (1)</option>
-                  <option value={2}>Elementary (2)</option>
-                  <option value={3}>Intermediate (3)</option>
-                  <option value={4}>Advanced (4)</option>
-                  <option value={5}>Expert (5)</option>
-                </select>
-              </div>
-
-              {/* Front Language Filter */}
-              <div>
-                <label className='block text-sm font-medium text-gray-700 mb-1'>
-                  Front Language
-                </label>
-                <select
-                  value={selectedFrontLanguage}
-                  onChange={(e) => setSelectedFrontLanguage(e.target.value)}
-                  className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
-                >
-                  <option value=''>All Languages</option>
-                  {languages.map((language) => (
-                    <option key={language.id} value={language.id}>
-                      {language.flag} {language.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Back Language Filter */}
-              <div>
-                <label className='block text-sm font-medium text-gray-700 mb-1'>
-                  Back Language
-                </label>
-                <select
-                  value={selectedBackLanguage}
-                  onChange={(e) => setSelectedBackLanguage(e.target.value)}
-                  className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
-                >
-                  <option value=''>All Languages</option>
-                  {languages.map((language) => (
-                    <option key={language.id} value={language.id}>
-                      {language.flag} {language.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Clear Filters */}
-              <div className='flex items-end'>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={() => {
-                    setSelectedType('');
-                    setSelectedDifficulty('');
-                    setSelectedFrontLanguage('');
-                    setSelectedBackLanguage('');
-                    setSearchTerm('');
-                  }}
-                  className='w-full'
-                >
-                  Clear All
-                </Button>
-              </div>
-            </div>
-          )}
+    <div className='w-full'>
+      {/* View Toggle Buttons */}
+      <div className='mb-6 flex justify-between items-center'>
+        <h1 className='text-2xl font-bold text-gray-900'>Your Card Library</h1>
+        <div className='flex rounded-lg bg-gray-100 p-1'>
+          <button
+            onClick={() => setViewMode('cards')}
+            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              viewMode === 'cards'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Grid3X3 className='h-4 w-4' />
+            Cards
+          </button>
+          <button
+            onClick={() => setViewMode('table')}
+            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              viewMode === 'table'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Table className='h-4 w-4' />
+            Table
+          </button>
         </div>
       </div>
 
-      {/* Cards Grid */}
-      <div className='w-full'>
-        {cards.length === 0 ? (
-          <div className='text-center py-12'>
-            <h3 className='mt-4 text-lg font-semibold text-gray-900'>
-              No cards found
-            </h3>
-            <p className='text-gray-500 mt-2'>
-              Try adjusting your filters or create some new cards.
-            </p>
+      {cards.length === 0 ? (
+        <div className='text-center py-12'>
+          <h3 className='mt-4 text-lg font-semibold text-gray-900'>
+            No cards found
+          </h3>
+          <p className='text-gray-500 mt-2'>
+            Try adjusting your filters or create some new cards.
+          </p>
+        </div>
+      ) : viewMode === 'cards' ? (
+        <div className='grid grid-cols-3 gap-6 w-full'>
+          {cards.map((card: Card) => (
+            <FlipCard
+              key={card.id}
+              card={card}
+              onClick={() => console.log(`Studied card: ${card.front}`)}
+              onArchive={handleArchiveCard}
+              onDelete={handleDeleteCard}
+              onUpdate={handleUpdateCard}
+              className='transform hover:scale-105 transition-transform duration-200'
+            />
+          ))}
+        </div>
+      ) : (
+        <div className='bg-white shadow-sm rounded-lg overflow-hidden'>
+          <div className='overflow-auto max-h-[70vh]'>
+            <table className='min-w-full'>
+              <thead className='bg-gray-50 sticky top-0 z-10'>
+                <tr>
+                  <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 w-12'>
+                    #
+                  </th>
+                  <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200'>
+                    Front
+                  </th>
+                  <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                    Back
+                  </th>
+                </tr>
+              </thead>
+              <tbody className='bg-white'>
+                {/* Existing cards */}
+                {cards.map((card: Card, index) => (
+                  <tr
+                    key={card.id}
+                    className='hover:bg-gray-50 border-b border-gray-100'
+                  >
+                    <td className='px-4 py-2 text-sm text-gray-500 border-r border-gray-200 bg-gray-50'>
+                      {index + 1}
+                    </td>
+                    <td className='px-4 py-2 border-r border-gray-200'>
+                      <textarea
+                        value={getCellValue(card.id, 'front')}
+                        onChange={(e) =>
+                          handleCellChange(card.id, 'front', e.target.value)
+                        }
+                        className='w-full min-h-[40px] p-2 text-sm border-none resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset bg-transparent overflow-hidden'
+                        rows={1}
+                        onInput={(e) => {
+                          const target = e.target as HTMLTextAreaElement;
+                          target.style.height = 'auto';
+                          target.style.height = `${Math.max(
+                            40,
+                            target.scrollHeight
+                          )}px`;
+                        }}
+                        placeholder='Front text...'
+                      />
+                    </td>
+                    <td className='px-4 py-2'>
+                      <textarea
+                        value={getCellValue(card.id, 'back')}
+                        onChange={(e) =>
+                          handleCellChange(card.id, 'back', e.target.value)
+                        }
+                        className='w-full min-h-[40px] p-2 text-sm border-none resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset bg-transparent overflow-hidden'
+                        rows={1}
+                        onInput={(e) => {
+                          const target = e.target as HTMLTextAreaElement;
+                          target.style.height = 'auto';
+                          target.style.height = `${Math.max(
+                            40,
+                            target.scrollHeight
+                          )}px`;
+                        }}
+                        placeholder='Back text...'
+                      />
+                    </td>
+                  </tr>
+                ))}
+
+                {/* New/Empty rows for adding cards */}
+                {newRows.map((row, index) => (
+                  <tr
+                    key={row.id}
+                    className='hover:bg-gray-50 border-b border-gray-100'
+                  >
+                    <td className='px-4 py-2 text-sm text-gray-500 border-r border-gray-200 bg-gray-50'>
+                      {cards.length + index + 1}
+                    </td>
+                    <td className='px-4 py-2 border-r border-gray-200'>
+                      <textarea
+                        value={getCellValue(row.id, 'front')}
+                        onChange={(e) =>
+                          handleCellChange(row.id, 'front', e.target.value)
+                        }
+                        className='w-full min-h-[40px] p-2 text-sm border-none resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset bg-transparent overflow-hidden'
+                        rows={1}
+                        onInput={(e) => {
+                          const target = e.target as HTMLTextAreaElement;
+                          target.style.height = 'auto';
+                          target.style.height = `${Math.max(
+                            40,
+                            target.scrollHeight
+                          )}px`;
+                        }}
+                        onFocus={() => {
+                          // Ensure we have enough empty rows when user starts typing
+                          if (index >= newRows.length - 5) {
+                            ensureEmptyRows();
+                          }
+                        }}
+                        placeholder='Front text...'
+                      />
+                    </td>
+                    <td className='px-4 py-2'>
+                      <textarea
+                        value={getCellValue(row.id, 'back')}
+                        onChange={(e) =>
+                          handleCellChange(row.id, 'back', e.target.value)
+                        }
+                        className='w-full min-h-[40px] p-2 text-sm border-none resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset bg-transparent overflow-hidden'
+                        rows={1}
+                        onInput={(e) => {
+                          const target = e.target as HTMLTextAreaElement;
+                          target.style.height = 'auto';
+                          target.style.height = `${Math.max(
+                            40,
+                            target.scrollHeight
+                          )}px`;
+                        }}
+                        onFocus={() => {
+                          // Ensure we have enough empty rows when user starts typing
+                          if (index >= newRows.length - 5) {
+                            ensureEmptyRows();
+                          }
+                        }}
+                        placeholder='Back text...'
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ) : (
-          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full'>
-            {cards.map((card: Card) => (
-              <FlipCard
-                key={card.id}
-                card={card}
-                showMetadata={true}
-                onClick={() => console.log(`Studied card: ${card.front}`)}
-                className='transform hover:scale-105 transition-transform duration-200'
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
-        <div className='flex justify-center items-center space-x-2 mt-8'>
-          <Button
-            variant='outline'
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage(currentPage - 1)}
-            size='sm'
-          >
-            Previous
-          </Button>
-
-          <div className='flex space-x-1'>
-            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
-              .filter((page) => {
-                const current = currentPage;
-                return (
-                  page === 1 ||
-                  page === pagination.totalPages ||
-                  (page >= current - 1 && page <= current + 1)
-                );
-              })
-              .map((page, index, array) => {
-                const prevPage = array[index - 1];
-                const showEllipsis = prevPage && page - prevPage > 1;
-
-                return (
-                  <div key={page} className='flex items-center'>
-                    {showEllipsis && (
-                      <span className='px-2 text-gray-500'>...</span>
-                    )}
-                    <Button
-                      variant={page === currentPage ? 'default' : 'outline'}
-                      onClick={() => setCurrentPage(page)}
-                      size='sm'
-                      className='w-10'
-                    >
-                      {page}
-                    </Button>
-                  </div>
-                );
-              })}
-          </div>
-
-          <Button
-            variant='outline'
-            disabled={currentPage === pagination.totalPages}
-            onClick={() => setCurrentPage(currentPage + 1)}
-            size='sm'
-          >
-            Next
-          </Button>
+          <div ref={tableEndRef} className='h-4' />
         </div>
       )}
     </div>

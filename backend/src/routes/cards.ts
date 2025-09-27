@@ -24,6 +24,7 @@ router.get('/my', authenticate, async (req: AuthRequest, res) => {
       difficulty,
       tags,
       deckId,
+      archived,
     } = req.query;
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -31,7 +32,7 @@ router.get('/my', authenticate, async (req: AuthRequest, res) => {
 
     const where: any = {
       ownerId: userId,
-      isArchived: false,
+      isArchived: archived === 'true' ? true : false,
     };
 
     // Search in front and back content

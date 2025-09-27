@@ -35,6 +35,7 @@ export interface UpdateCardRequest {
   tags?: string[];
   frontLanguageId?: string;
   backLanguageId?: string;
+  isArchived?: boolean;
 }
 
 export interface GetCardsParams extends PaginationParams {
@@ -43,6 +44,7 @@ export interface GetCardsParams extends PaginationParams {
   difficulty?: number;
   tags?: string[];
   languageId?: string;
+  archived?: boolean;
 }
 
 export interface GetDueCardsParams {
@@ -130,6 +132,28 @@ export class CardService {
   static async deleteCard(id: string): Promise<ApiResponse<void>> {
     const response: AxiosResponse<ApiResponse<void>> = await api.delete(
       `/cards/${id}`
+    );
+    return response.data;
+  }
+
+  /**
+   * Archive card
+   */
+  static async archiveCard(id: string): Promise<ApiResponse<Card>> {
+    const response: AxiosResponse<ApiResponse<Card>> = await api.put(
+      `/cards/${id}`,
+      { isArchived: true }
+    );
+    return response.data;
+  }
+
+  /**
+   * Unarchive card
+   */
+  static async unarchiveCard(id: string): Promise<ApiResponse<Card>> {
+    const response: AxiosResponse<ApiResponse<Card>> = await api.put(
+      `/cards/${id}`,
+      { isArchived: false }
     );
     return response.data;
   }
