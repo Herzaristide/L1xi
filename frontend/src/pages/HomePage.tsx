@@ -4,9 +4,18 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { Keyboard } from '@/components/ui/Keyboard';
-import { Check, Keyboard as KeyboardIcon } from 'lucide-react';
+import {
+  Check,
+  Keyboard as KeyboardIcon,
+  Shuffle,
+  ArrowRight,
+  ArrowLeft,
+} from 'lucide-react';
 import { ReviewService, CardService } from '@/lib/services';
 import type { Card as CardType } from '@/lib/services';
+
+// Study mode types
+type StudyMode = 'front-to-back' | 'back-to-front' | 'random';
 
 // Language to keyboard layout mapping
 const getKeyboardLayout = (languageName?: string) => {
@@ -74,11 +83,56 @@ export default function HomePage() {
   const [reviewing, setReviewing] = useState(false);
   const [cardsQueue, setCardsQueue] = useState<CardData[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [studyMode, setStudyMode] = useState<StudyMode>('front-to-back');
+  const [cardDirection, setCardDirection] = useState<
+    'front-to-back' | 'back-to-front'
+  >('front-to-back');
   const [_sessionStats, setSessionStats] = useState({
     reviewed: 0,
     correct: 0,
     remaining: 0,
   });
+
+  // Determine card direction based on study mode
+  const determineCardDirection = (): 'front-to-back' | 'back-to-front' => {
+    switch (studyMode) {
+      case 'front-to-back':
+        return 'front-to-back';
+      case 'back-to-front':
+        return 'back-to-front';
+      case 'random':
+        return Math.random() > 0.5 ? 'front-to-back' : 'back-to-front';
+      default:
+        return 'front-to-back';
+    }
+  };
+
+  // Get the question and answer based on current direction
+  const getQuestionAndAnswer = () => {
+    if (!currentCard)
+      return {
+        question: '',
+        answer: '',
+        questionLanguage: null,
+        answerLanguage: null,
+      };
+
+    if (cardDirection === 'front-to-back') {
+      return {
+        question: currentCard.card.front,
+        answer: currentCard.card.back,
+        questionLanguage: currentCard.card.frontLanguage,
+        answerLanguage: currentCard.card.backLanguage,
+      };
+    } else {
+      return {
+        question: currentCard.card.back,
+        answer: currentCard.card.front,
+        questionLanguage: currentCard.card.backLanguage,
+        answerLanguage: currentCard.card.frontLanguage,
+      };
+    }
+  };
 
   // Load all user cards for study (excluding archived)
   const loadAllCards = async () => {
@@ -119,6 +173,10 @@ export default function HomePage() {
         setCardsQueue(shuffledCards);
         setCurrentCard(shuffledCards[0] || null);
         setCurrentIndex(0);
+
+        // Set initial card direction based on study mode
+        setCardDirection(determineCardDirection());
+
         setSessionStats((prev) => ({
           ...prev,
           remaining: shuffledCards.length,
@@ -171,15 +229,16 @@ export default function HomePage() {
   const checkAnswer = () => {
     if (!currentCard || !userAnswer.trim()) return;
 
-    const correctAnswer = currentCard.card.back.toLowerCase().trim();
+    const { answer: correctAnswer } = getQuestionAndAnswer();
+    const correctAnswerLower = correctAnswer.toLowerCase().trim();
     const userAnswerLower = userAnswer.toLowerCase().trim();
 
     // Check for exact match or very close match (allowing minor typos)
     const correct =
-      correctAnswer === userAnswerLower ||
-      (Math.abs(correctAnswer.length - userAnswerLower.length) <= 1 &&
+      correctAnswerLower === userAnswerLower ||
+      (Math.abs(correctAnswerLower.length - userAnswerLower.length) <= 1 &&
         userAnswerLower.includes(
-          correctAnswer.substring(0, correctAnswer.length - 1)
+          correctAnswerLower.substring(0, correctAnswerLower.length - 1)
         ));
 
     setIsCorrect(correct);
@@ -329,12 +388,19 @@ export default function HomePage() {
       if (nextIndex < cardsQueue.length) {
         setCurrentCard(cardsQueue[nextIndex]);
         setCurrentIndex(nextIndex);
+
+        // Set new direction for the next card based on study mode
+        setCardDirection(determineCardDirection());
       } else {
         // Completed all cards - restart with shuffled deck
         const shuffledCards = [...cardsQueue].sort(() => Math.random() - 0.5);
         setCardsQueue(shuffledCards);
         setCurrentCard(shuffledCards[0]);
         setCurrentIndex(0);
+
+        // Set new direction for restarted deck
+        setCardDirection(determineCardDirection());
+
         setSessionStats((prev) => ({
           reviewed: prev.reviewed,
           correct: prev.correct,
@@ -380,20 +446,83 @@ export default function HomePage() {
     <div className='flex w-full bg-gray-50'>
       <div className='flex-1 flex flex-col items-center justify-center p-8'>
         <div className='w-full max-w-2xl'>
+          {/* Study Mode Selector */}
+          <div className='mb-6 flex justify-center'>
+            <div className='flex bg-white rounded-lg p-1 shadow-sm border'>
+              <button
+                onClick={() => {
+                  setStudyMode('front-to-back');
+                  setCardDirection('front-to-back');
+                  // Reset current card state to apply new mode immediately
+                  setShowAnswer(false);
+                  setUserAnswer('');
+                  setIsCorrect(null);
+                }}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  studyMode === 'front-to-back'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+                title='Show front, guess back'
+              >
+                <ArrowRight className='h-4 w-4' />
+                Front → Back
+              </button>
+              <button
+                onClick={() => {
+                  setStudyMode('back-to-front');
+                  setCardDirection('back-to-front');
+                  // Reset current card state to apply new mode immediately
+                  setShowAnswer(false);
+                  setUserAnswer('');
+                  setIsCorrect(null);
+                }}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  studyMode === 'back-to-front'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+                title='Show back, guess front'
+              >
+                <ArrowLeft className='h-4 w-4' />
+                Back → Front
+              </button>
+              <button
+                onClick={() => {
+                  setStudyMode('random');
+                  setCardDirection(determineCardDirection());
+                  // Reset current card state to apply new mode immediately
+                  setShowAnswer(false);
+                  setUserAnswer('');
+                  setIsCorrect(null);
+                }}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  studyMode === 'random'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+                title='Random direction for each card'
+              >
+                <Shuffle className='h-4 w-4' />
+                Random
+              </button>
+            </div>
+          </div>
+
           <div className='bg-white rounded-lg p-8 min-h-[400px] flex flex-col justify-center'>
             {/* Language Flag */}
-            {currentCard.card.frontLanguage && (
+            {getQuestionAndAnswer().questionLanguage && (
               <div className='flex justify-center mb-4'>
                 <span className='text-2xl'>
-                  {currentCard.card.frontLanguage.flag}
+                  {getQuestionAndAnswer().questionLanguage?.flag}
                 </span>
               </div>
             )}
 
-            {/* Front Content */}
+            {/* Question Content */}
             <div className='text-center mb-8'>
               <h2 className='text-4xl font-bold text-gray-900 mb-4'>
-                {currentCard.card.front}
+                {getQuestionAndAnswer().question}
               </h2>
             </div>
 
@@ -402,29 +531,29 @@ export default function HomePage() {
               {!showAnswer ? (
                 // Input Phase
                 <form onSubmit={handleSubmitAnswer} className='space-y-4'>
-                  <div className='relative'>
+                  <div className='flex gap-2'>
                     <Input
                       type='text'
                       value={userAnswer}
                       onChange={(e) => setUserAnswer(e.target.value)}
                       placeholder='Type your answer here...'
-                      className='w-full text-xl p-4 text-center border-2 border-gray-300 rounded-lg focus:border-blue-500'
+                      className='flex w-full text-xl p-4 text-center border-gray-300 rounded-lg focus:outline-none focus:ring-0 focus:border-gray-300'
                       autoFocus={!showKeyboard}
                       disabled={reviewing}
                     />
+                    <button
+                      type='button'
+                      onClick={() => setShowKeyboard(!showKeyboard)}
+                      className={`flex w-10 justify-center items-center aspect-square rounded transition-colors ${
+                        showKeyboard
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                      }`}
+                      title='Toggle virtual keyboard'
+                    >
+                      <KeyboardIcon className='w-4 h-4' />
+                    </button>
                     <div className='absolute right-12 top-1/2 transform -translate-y-1/2 flex items-center gap-2'>
-                      <button
-                        type='button'
-                        onClick={() => setShowKeyboard(!showKeyboard)}
-                        className={`p-2 rounded transition-colors ${
-                          showKeyboard
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                        }`}
-                        title='Toggle virtual keyboard'
-                      >
-                        <KeyboardIcon className='w-4 h-4' />
-                      </button>
                       {currentCard.card.backLanguage && (
                         <span className='text-lg'>
                           {currentCard.card.backLanguage.flag}
@@ -440,7 +569,7 @@ export default function HomePage() {
                         onKeyPress={handleKeyboardKeyPress}
                         disabled={reviewing}
                         currentAlphabet={getKeyboardLayout(
-                          currentCard.card.backLanguage?.name
+                          getQuestionAndAnswer().answerLanguage?.name
                         )}
                         className='max-w-4xl mx-auto'
                       />
@@ -469,9 +598,20 @@ export default function HomePage() {
                       {isCorrect ? '✓ Correct!' : '✗ Incorrect'}
                     </div>
                     <div>
-                      <span className='font-medium'>Correct answer: </span>
-                      <span className='font-bold'>{currentCard.card.back}</span>
+                      <span className='font-medium'>
+                        {cardDirection === 'front-to-back' ? 'Back' : 'Front'}:
+                      </span>
+                      <span className='font-bold ml-2'>
+                        {getQuestionAndAnswer().answer}
+                      </span>
                     </div>
+                    {getQuestionAndAnswer().answerLanguage && (
+                      <div className='mt-2'>
+                        <span className='text-lg'>
+                          {getQuestionAndAnswer().answerLanguage?.flag}
+                        </span>
+                      </div>
+                    )}
                     {!isCorrect && (
                       <div className='mt-2 text-sm'>
                         <span className='font-medium'>Your answer: </span>
@@ -513,7 +653,7 @@ export default function HomePage() {
                         value={userAnswer}
                         onChange={(e) => setUserAnswer(e.target.value)}
                         placeholder='Type the correct answer...'
-                        className='w-full text-xl p-4 text-center border-2 border-gray-300 rounded-lg focus:border-blue-500'
+                        className='w-full text-xl p-4 text-center border-2 border-gray-300 rounded-lg focus:outline-none'
                         autoFocus={!showKeyboard}
                         disabled={reviewing}
                       />

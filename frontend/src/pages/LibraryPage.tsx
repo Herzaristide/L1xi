@@ -1,12 +1,13 @@
 import { useState, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Grid3X3, Table } from 'lucide-react';
-import { CardService } from '@/lib/services';
-import type { Card } from '@/lib/services/types';
+import { Grid3X3, Table, X } from 'lucide-react';
+import { CardService, LanguageService } from '@/lib/services';
+import type { Card, Language } from '@/lib/services/types';
 import type { CreateCardRequest } from '@/lib/services';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { FlipCard } from '@/components/ui/FlipCard';
 import { useCardOperations } from '@/lib/hooks/useCardOperations';
+import { LanguageFlag } from '@/components/ui/LanguageFlag';
 
 export default function LibraryPage() {
   const [searchTerm, _setSearchTerm] = useState('');
@@ -23,11 +24,23 @@ export default function LibraryPage() {
     {}
   );
   const [newRows, setNewRows] = useState<
-    Array<{ front: string; back: string; id: string }>
+    Array<{
+      front: string;
+      back: string;
+      id: string;
+      frontLanguageId?: string;
+      backLanguageId?: string;
+    }>
   >([]);
   const [saveTimeouts, setSaveTimeouts] = useState<{ [key: string]: number }>(
     {}
   );
+  const [languageModal, setLanguageModal] = useState<{
+    isOpen: boolean;
+    cardId: string | null;
+    field: 'front' | 'back' | null;
+    currentLanguageId: string | null;
+  }>({ isOpen: false, cardId: null, field: null, currentLanguageId: null });
   const tableEndRef = useRef<HTMLDivElement>(null);
 
   const { archiveCard, deleteCard, updateCard } = useCardOperations();
@@ -60,6 +73,17 @@ export default function LibraryPage() {
     },
   });
 
+  // Query for available languages
+  const { data: languagesResponse } = useQuery({
+    queryKey: ['languages'],
+    queryFn: async () => {
+      const response = await LanguageService.getLanguages();
+      return response.success ? response.data : [];
+    },
+  });
+
+  const languages = Array.isArray(languagesResponse) ? languagesResponse : [];
+
   const cards = cardsResponse?.items || [];
 
   // Excel-like table functionality
@@ -68,6 +92,8 @@ export default function LibraryPage() {
       id: `new-${Date.now()}-${index}`,
       front: '',
       back: '',
+      frontLanguageId: undefined,
+      backLanguageId: undefined,
     }));
   };
 
@@ -91,11 +117,13 @@ export default function LibraryPage() {
 
           const updatedRow = { ...currentRow, [field]: value };
           if (updatedRow.front.trim() && updatedRow.back.trim()) {
-            // Create new card
+            // Create new card with language IDs
             const newCard: CreateCardRequest = {
               type: 'TRANSLATION',
               front: updatedRow.front.trim(),
               back: updatedRow.back.trim(),
+              frontLanguageId: updatedRow.frontLanguageId,
+              backLanguageId: updatedRow.backLanguageId,
             };
 
             const response = await CardService.createCard(newCard);
@@ -188,6 +216,70 @@ export default function LibraryPage() {
     await updateCard(cardId, updatedData);
   };
 
+  // Language editing functions
+  const handleLanguageFlagClick = (
+    cardId: string,
+    field: 'front' | 'back',
+    currentLanguageId: string | null
+  ) => {
+    setLanguageModal({
+      isOpen: true,
+      cardId,
+      field,
+      currentLanguageId,
+    });
+  };
+
+  const handleLanguageSelect = async (languageId: string | null) => {
+    if (!languageModal.cardId || !languageModal.field) return;
+
+    try {
+      if (languageModal.cardId.startsWith('new-')) {
+        // Handle new row language selection
+        const fieldName =
+          languageModal.field === 'front'
+            ? 'frontLanguageId'
+            : 'backLanguageId';
+        setNewRows((prev) =>
+          prev.map((row) =>
+            row.id === languageModal.cardId
+              ? { ...row, [fieldName]: languageId }
+              : row
+          )
+        );
+      } else {
+        // Handle existing card language selection
+        const fieldName =
+          languageModal.field === 'front'
+            ? 'frontLanguageId'
+            : 'backLanguageId';
+
+        await handleUpdateCard(languageModal.cardId, {
+          [fieldName]: languageId,
+        });
+      }
+
+      // Close modal
+      setLanguageModal({
+        isOpen: false,
+        cardId: null,
+        field: null,
+        currentLanguageId: null,
+      });
+    } catch (error) {
+      console.error('Failed to update language:', error);
+    }
+  };
+
+  const closeLanguageModal = () => {
+    setLanguageModal({
+      isOpen: false,
+      cardId: null,
+      field: null,
+      currentLanguageId: null,
+    });
+  };
+
   if (isLoading) {
     return (
       <div className='flex items-center justify-center min-h-[400px]'>
@@ -263,10 +355,16 @@ export default function LibraryPage() {
                     #
                   </th>
                   <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200'>
-                    Front
+                    <div className='flex items-center gap-2'>
+                      <span>Front</span>
+                      <span className='text-gray-400'>🌍</span>
+                    </div>
                   </th>
                   <th className='px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                    Back
+                    <div className='flex items-center gap-2'>
+                      <span>Back</span>
+                      <span className='text-gray-400'>🌍</span>
+                    </div>
                   </th>
                 </tr>
               </thead>
@@ -281,42 +379,86 @@ export default function LibraryPage() {
                       {index + 1}
                     </td>
                     <td className='px-4 py-2 border-r border-gray-200'>
-                      <textarea
-                        value={getCellValue(card.id, 'front')}
-                        onChange={(e) =>
-                          handleCellChange(card.id, 'front', e.target.value)
-                        }
-                        className='w-full min-h-[40px] p-2 text-sm border-none resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset bg-transparent overflow-hidden'
-                        rows={1}
-                        onInput={(e) => {
-                          const target = e.target as HTMLTextAreaElement;
-                          target.style.height = 'auto';
-                          target.style.height = `${Math.max(
-                            40,
-                            target.scrollHeight
-                          )}px`;
-                        }}
-                        placeholder='Front text...'
-                      />
+                      <div className='flex items-center justify-between'>
+                        <textarea
+                          value={getCellValue(card.id, 'front')}
+                          onChange={(e) =>
+                            handleCellChange(card.id, 'front', e.target.value)
+                          }
+                          className='w-full min-h-[40px] p-2 text-sm border-none resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset bg-transparent overflow-hidden'
+                          rows={1}
+                          onInput={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            target.style.height = `${Math.max(
+                              40,
+                              target.scrollHeight
+                            )}px`;
+                          }}
+                          placeholder='Front text...'
+                        />
+                        <div className='ml-2 flex-shrink-0'>
+                          <button
+                            onClick={() =>
+                              handleLanguageFlagClick(
+                                card.id,
+                                'front',
+                                card.frontLanguage?.id || null
+                              )
+                            }
+                            className='hover:bg-gray-100 rounded p-1 transition-colors'
+                            title={`Current: ${
+                              card.frontLanguage?.name || 'No language'
+                            } - Click to change`}
+                          >
+                            <LanguageFlag
+                              language={card.frontLanguage}
+                              size='sm'
+                            />
+                          </button>
+                        </div>
+                      </div>
                     </td>
                     <td className='px-4 py-2'>
-                      <textarea
-                        value={getCellValue(card.id, 'back')}
-                        onChange={(e) =>
-                          handleCellChange(card.id, 'back', e.target.value)
-                        }
-                        className='w-full min-h-[40px] p-2 text-sm border-none resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset bg-transparent overflow-hidden'
-                        rows={1}
-                        onInput={(e) => {
-                          const target = e.target as HTMLTextAreaElement;
-                          target.style.height = 'auto';
-                          target.style.height = `${Math.max(
-                            40,
-                            target.scrollHeight
-                          )}px`;
-                        }}
-                        placeholder='Back text...'
-                      />
+                      <div className='flex items-center justify-between'>
+                        <textarea
+                          value={getCellValue(card.id, 'back')}
+                          onChange={(e) =>
+                            handleCellChange(card.id, 'back', e.target.value)
+                          }
+                          className='w-full min-h-[40px] p-2 text-sm border-none resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset bg-transparent overflow-hidden'
+                          rows={1}
+                          onInput={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            target.style.height = `${Math.max(
+                              40,
+                              target.scrollHeight
+                            )}px`;
+                          }}
+                          placeholder='Back text...'
+                        />
+                        <div className='ml-2 flex-shrink-0'>
+                          <button
+                            onClick={() =>
+                              handleLanguageFlagClick(
+                                card.id,
+                                'back',
+                                card.backLanguage?.id || null
+                              )
+                            }
+                            className='hover:bg-gray-100 rounded p-1 transition-colors'
+                            title={`Current: ${
+                              card.backLanguage?.name || 'No language'
+                            } - Click to change`}
+                          >
+                            <LanguageFlag
+                              language={card.backLanguage}
+                              size='sm'
+                            />
+                          </button>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -331,54 +473,136 @@ export default function LibraryPage() {
                       {cards.length + index + 1}
                     </td>
                     <td className='px-4 py-2 border-r border-gray-200'>
-                      <textarea
-                        value={getCellValue(row.id, 'front')}
-                        onChange={(e) =>
-                          handleCellChange(row.id, 'front', e.target.value)
-                        }
-                        className='w-full min-h-[40px] p-2 text-sm border-none resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset bg-transparent overflow-hidden'
-                        rows={1}
-                        onInput={(e) => {
-                          const target = e.target as HTMLTextAreaElement;
-                          target.style.height = 'auto';
-                          target.style.height = `${Math.max(
-                            40,
-                            target.scrollHeight
-                          )}px`;
-                        }}
-                        onFocus={() => {
-                          // Ensure we have enough empty rows when user starts typing
-                          if (index >= newRows.length - 5) {
-                            ensureEmptyRows();
+                      <div className='flex items-center justify-between'>
+                        <textarea
+                          value={getCellValue(row.id, 'front')}
+                          onChange={(e) =>
+                            handleCellChange(row.id, 'front', e.target.value)
                           }
-                        }}
-                        placeholder='Front text...'
-                      />
+                          className='w-full min-h-[40px] p-2 text-sm border-none resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset bg-transparent overflow-hidden'
+                          rows={1}
+                          onInput={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            target.style.height = `${Math.max(
+                              40,
+                              target.scrollHeight
+                            )}px`;
+                          }}
+                          onFocus={() => {
+                            // Ensure we have enough empty rows when user starts typing
+                            if (index >= newRows.length - 5) {
+                              ensureEmptyRows();
+                            }
+                          }}
+                          placeholder='Front text...'
+                        />
+                        <div className='ml-2 flex-shrink-0'>
+                          <button
+                            onClick={() => {
+                              const currentRow = newRows.find(
+                                (r) => r.id === row.id
+                              );
+                              handleLanguageFlagClick(
+                                row.id,
+                                'front',
+                                currentRow?.frontLanguageId || null
+                              );
+                            }}
+                            className='hover:bg-gray-100 rounded p-1 transition-colors'
+                            title={`Current: ${
+                              (Array.isArray(languages)
+                                ? languages.find(
+                                    (lang) =>
+                                      lang.id ===
+                                      newRows.find((r) => r.id === row.id)
+                                        ?.frontLanguageId
+                                  )?.name
+                                : undefined) || 'No language'
+                            } - Click to change`}
+                          >
+                            <LanguageFlag
+                              language={
+                                (Array.isArray(languages)
+                                  ? languages.find(
+                                      (lang) =>
+                                        lang.id ===
+                                        newRows.find((r) => r.id === row.id)
+                                          ?.frontLanguageId
+                                    )
+                                  : undefined) || undefined
+                              }
+                              size='sm'
+                            />
+                          </button>
+                        </div>
+                      </div>
                     </td>
                     <td className='px-4 py-2'>
-                      <textarea
-                        value={getCellValue(row.id, 'back')}
-                        onChange={(e) =>
-                          handleCellChange(row.id, 'back', e.target.value)
-                        }
-                        className='w-full min-h-[40px] p-2 text-sm border-none resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset bg-transparent overflow-hidden'
-                        rows={1}
-                        onInput={(e) => {
-                          const target = e.target as HTMLTextAreaElement;
-                          target.style.height = 'auto';
-                          target.style.height = `${Math.max(
-                            40,
-                            target.scrollHeight
-                          )}px`;
-                        }}
-                        onFocus={() => {
-                          // Ensure we have enough empty rows when user starts typing
-                          if (index >= newRows.length - 5) {
-                            ensureEmptyRows();
+                      <div className='flex items-center justify-between'>
+                        <textarea
+                          value={getCellValue(row.id, 'back')}
+                          onChange={(e) =>
+                            handleCellChange(row.id, 'back', e.target.value)
                           }
-                        }}
-                        placeholder='Back text...'
-                      />
+                          className='w-full min-h-[40px] p-2 text-sm border-none resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset bg-transparent overflow-hidden'
+                          rows={1}
+                          onInput={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            target.style.height = `${Math.max(
+                              40,
+                              target.scrollHeight
+                            )}px`;
+                          }}
+                          onFocus={() => {
+                            // Ensure we have enough empty rows when user starts typing
+                            if (index >= newRows.length - 5) {
+                              ensureEmptyRows();
+                            }
+                          }}
+                          placeholder='Back text...'
+                        />
+                        <div className='ml-2 flex-shrink-0'>
+                          <button
+                            onClick={() => {
+                              const currentRow = newRows.find(
+                                (r) => r.id === row.id
+                              );
+                              handleLanguageFlagClick(
+                                row.id,
+                                'back',
+                                currentRow?.backLanguageId || null
+                              );
+                            }}
+                            className='hover:bg-gray-100 rounded p-1 transition-colors'
+                            title={`Current: ${
+                              (Array.isArray(languages)
+                                ? languages.find(
+                                    (lang) =>
+                                      lang.id ===
+                                      newRows.find((r) => r.id === row.id)
+                                        ?.backLanguageId
+                                  )?.name
+                                : undefined) || 'No language'
+                            } - Click to change`}
+                          >
+                            <LanguageFlag
+                              language={
+                                (Array.isArray(languages)
+                                  ? languages.find(
+                                      (lang) =>
+                                        lang.id ===
+                                        newRows.find((r) => r.id === row.id)
+                                          ?.backLanguageId
+                                    )
+                                  : undefined) || undefined
+                              }
+                              size='sm'
+                            />
+                          </button>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -386,6 +610,92 @@ export default function LibraryPage() {
             </table>
           </div>
           <div ref={tableEndRef} className='h-4' />
+        </div>
+      )}
+
+      {/* Language Selection Modal */}
+      {languageModal.isOpen && (
+        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
+          <div className='bg-white rounded-lg p-6 w-full max-w-md mx-4'>
+            <div className='flex items-center justify-between mb-4'>
+              <h3 className='text-lg font-semibold'>
+                Select {languageModal.field === 'front' ? 'Front' : 'Back'}{' '}
+                Language
+              </h3>
+              <button
+                onClick={closeLanguageModal}
+                className='text-gray-400 hover:text-gray-600'
+                title='Close modal'
+              >
+                <X className='h-5 w-5' />
+              </button>
+            </div>
+
+            <div className='mb-4'>
+              <p className='text-sm text-gray-600'>
+                Choose the language for the{' '}
+                {languageModal.field === 'front' ? 'front' : 'back'} side of
+                this card. Click on a language flag to change it.
+              </p>
+            </div>
+
+            <div className='space-y-2 max-h-60 overflow-y-auto'>
+              {/* No Language Option */}
+              <button
+                onClick={() => handleLanguageSelect(null)}
+                className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                  languageModal.currentLanguageId === null
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <div className='flex items-center gap-3'>
+                  <div className='w-6 h-6 rounded border border-gray-300 bg-gray-100 flex items-center justify-center'>
+                    <span className='text-xs text-gray-500'>?</span>
+                  </div>
+                  <span className='text-gray-700'>No Language</span>
+                </div>
+              </button>
+
+              {/* Language Options */}
+              {Array.isArray(languages) &&
+                languages.map((language: Language) => (
+                  <button
+                    key={language.id}
+                    onClick={() => handleLanguageSelect(language.id)}
+                    className={`w-full text-left p-3 rounded-lg border transition-all duration-200 ${
+                      languageModal.currentLanguageId === language.id
+                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                        : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className='flex items-center gap-3'>
+                      <span className='text-2xl'>{language.flag}</span>
+                      <div className='flex-1'>
+                        <span className='font-medium text-gray-900'>
+                          {language.name}
+                        </span>
+                        <div className='text-sm text-gray-500'>
+                          {language.code}
+                        </div>
+                      </div>
+                      {languageModal.currentLanguageId === language.id && (
+                        <div className='text-blue-500'>✓</div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+            </div>
+
+            <div className='flex gap-2 mt-6'>
+              <button
+                onClick={closeLanguageModal}
+                className='flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors'
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -402,23 +402,19 @@ function FlipCard({
               {/* Header */}
               <div className='flex justify-between items-start mb-4'>
                 <div className='flex items-center gap-2'>
-                  {card.frontLanguage && (
-                    <LanguageFlag language={card.frontLanguage} size='sm' />
-                  )}
+                  <LanguageFlag language={card.frontLanguage} size='sm' />
                 </div>
                 <div className='flex items-center space-x-2'>
-                  {card.pronunciation && (
-                    <button
-                      className='p-1 hover:bg-gray-100 rounded transition-colors'
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Add audio playback functionality here
-                      }}
-                      title='Play pronunciation'
-                    >
-                      <Volume2 className='h-4 w-4 text-gray-600' />
-                    </button>
-                  )}
+                  <button
+                    className='p-1 hover:bg-gray-100 rounded transition-colors'
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Add audio playback functionality here
+                    }}
+                    title='Play pronunciation'
+                  >
+                    <Volume2 className='h-4 w-4 text-gray-600' />
+                  </button>
                   <button
                     className={`p-1 hover:bg-gray-100 rounded transition-colors ${
                       isShowingStats
