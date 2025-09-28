@@ -67,11 +67,13 @@ export function getRandomColor() {
 
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
-  delay: number
+  wait: number
 ): (...args: Parameters<T>) => void {
-  let timeoutId: NodeJS.Timeout;
+  let timeout: number | undefined;
   return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func(...args), delay);
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(() => func(...args), wait) as unknown as number;
   };
 }

@@ -73,14 +73,6 @@ function FlipCard({
     }
   };
 
-  // Calculate dynamic rows based on content
-  const calculateRows = (text: string) => {
-    const lines = text.split('\n').length;
-    const charsPerLine = 30; // Approximate chars per line for text-2xl
-    const estimatedLines = Math.ceil(text.length / charsPerLine);
-    return Math.max(1, Math.max(lines, estimatedLines));
-  };
-
   // Auto-resize textarea function
   const autoResizeTextarea = (textarea: HTMLTextAreaElement) => {
     textarea.style.height = 'auto';
@@ -594,7 +586,7 @@ function FlipCard({
                     </button>
                   )}
                   {card.backLanguage && (
-                    <LanguageFlag language={card.backLanguage} size='sm' />
+                    <LanguageFlag language={card.backLanguage} />
                   )}
                 </div>
                 <div className='flex items-center space-x-2'>

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { X, Upload, FileText, FileSpreadsheet, Code } from 'lucide-react';
+import { X, Upload, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 interface ColumnMapping {

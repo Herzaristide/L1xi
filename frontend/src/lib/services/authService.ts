@@ -1,6 +1,6 @@
 import { AxiosResponse } from 'axios';
 import { api } from '../api';
-import { ApiResponse, User, UserStats } from './types';
+import { ApiResponse, User } from './types';
 
 export interface LoginRequest {
   email: string;

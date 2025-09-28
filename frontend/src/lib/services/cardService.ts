@@ -108,7 +108,7 @@ export class CardService {
     const response = await this.createCards([cardData]);
     return {
       ...response,
-      data: response.data.cards[0],
+      data: response.data?.cards[0],
     };
   }
 

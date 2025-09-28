@@ -77,9 +77,6 @@ export default function HomePage() {
   const [userAnswer, setUserAnswer] = useState('');
   const [originalWrongAnswer, setOriginalWrongAnswer] = useState('');
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-  const [reviewStatus, setReviewStatus] = useState<
-    'idle' | 'submitting' | 'success' | 'error'
-  >('idle');
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [loading, setLoading] = useState(true);
   const [reviewing, setReviewing] = useState(false);
@@ -337,9 +334,6 @@ export default function HomePage() {
       // Determine quality based on correctness (4 = easy/correct, 2 = hard/incorrect)
       const quality = isCorrect ? 4 : 2;
 
-      // Submit review with proper error handling
-      setReviewStatus('submitting');
-
       try {
         const reviewResponse = await ReviewService.submitReview({
           cardId: currentCard.card.id,
@@ -348,7 +342,6 @@ export default function HomePage() {
 
         if (reviewResponse.success && reviewResponse.data) {
           console.log('Review submitted successfully:', reviewResponse.data);
-          setReviewStatus('success');
 
           // Debug logging
           console.log('Current card before update:', currentCard);
@@ -372,14 +365,12 @@ export default function HomePage() {
           });
         } else {
           console.error('Review submission failed:', reviewResponse.message);
-          setReviewStatus('error');
           alert(
             'Warning: Review could not be saved. Your progress may not be tracked.'
           );
         }
       } catch (reviewError: any) {
         console.error('Failed to submit review:', reviewError);
-        setReviewStatus('error');
 
         // Detailed error logging
         console.error('Review error details:', {
@@ -435,7 +426,6 @@ export default function HomePage() {
       setUserAnswer('');
       setOriginalWrongAnswer('');
       setIsCorrect(null);
-      setReviewStatus('idle');
 
       // Move to next card
       const nextIndex = currentIndex + 1;

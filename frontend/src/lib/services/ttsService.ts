@@ -119,12 +119,12 @@ export class TTSService {
           resolve();
         };
 
-        audio.onerror = (error) => {
+        audio.onerror = () => {
           URL.revokeObjectURL(audioUrl);
           reject(new Error('Failed to play audio'));
         };
 
-        audio.play().catch((error) => {
+        audio.play().catch(() => {
           URL.revokeObjectURL(audioUrl);
           reject(new Error('Browser blocked audio playback'));
         });

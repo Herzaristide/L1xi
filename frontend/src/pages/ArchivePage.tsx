@@ -250,7 +250,6 @@ export default function ArchivePage() {
               <FlipCard
                 key={card.id}
                 card={card}
-                showMetadata={true}
                 onClick={() =>
                   console.log(`Viewed archived card: ${card.front}`)
                 }

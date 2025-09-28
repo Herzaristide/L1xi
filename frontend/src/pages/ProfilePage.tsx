@@ -1,73 +1,8 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
-import { Button } from '@/components/ui/Button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/FlipCardold';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
-import {
-  User,
-  LogOut,
-  Edit,
-  Save,
-  X,
-  Mail,
-  Calendar,
-  Clock,
-} from 'lucide-react';
+import { User } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { user, logout, updateProfile, isLoading } = useAuthStore();
-  const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-  });
-
-  const handleDisconnect = () => {
-    logout();
-    navigate('/auth/login');
-  };
-
-  const handleEditProfile = () => {
-    setIsEditing(true);
-    setFormData({
-      firstName: user?.firstName || '',
-      lastName: user?.lastName || '',
-    });
-  };
-
-  const handleSaveProfile = async () => {
-    try {
-      await updateProfile(formData);
-      setIsEditing(false);
-    } catch (error) {
-      // Error is already handled by the store
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setFormData({
-      firstName: user?.firstName || '',
-      lastName: user?.lastName || '',
-    });
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
+  const { user } = useAuthStore();
 
   if (!user) {
     return (
