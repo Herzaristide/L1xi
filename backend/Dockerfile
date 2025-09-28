@@ -22,6 +22,9 @@ CMD ["npm", "run", "dev"]
 # Build stage for production
 FROM base AS builder
 WORKDIR /app
+
+RUN apk add --no-cache openssl
+
 COPY package*.json ./
 RUN npm ci
 COPY . .

@@ -7,16 +7,16 @@ services:
     container_name: l1xi_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: l1xi_user
-      POSTGRES_PASSWORD: l1xi_password
-      POSTGRES_DB: l1xi_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U l1xi_user -d l1xi_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,22 +29,24 @@ services:
     container_name: l1xi_backend
     restart: unless-stopped
     environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://l1xi_user:l1xi_password@postgres:5432/l1xi_db
-      JWT_SECRET: your_jwt_secret_here_change_this
-      PORT: 5000
-      FRONTEND_URL: http://localhost:3000
-      RATE_LIMIT_WINDOW_MS: 900000
-      RATE_LIMIT_MAX_REQUESTS: 100
+      NODE_ENV: ${NODE_ENV}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: ${PORT}
+      FRONTEND_URL: ${FRONTEND_URL}
+      DESKTOP_URL: ${DESKTOP_URL}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS}
+      NODE_TLS_REJECT_UNAUTHORIZED: ${NODE_TLS_REJECT_UNAUTHORIZED}
     ports:
-      - "5000:5000"
+      - "${PORT}:${PORT}"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./backend/temp:/app/temp
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -57,7 +59,7 @@ services:
     container_name: l1xi_frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://localhost:5000/api
+      VITE_API_URL: ${API_URL}
     ports:
       - "3000:80"
     depends_on:
@@ -74,6 +76,7 @@ services:
     image: redis:7-alpine
     container_name: l1xi_redis
     restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     ports:
       - "6379:6379"
     volumes:
@@ -85,8 +88,8 @@ services:
     container_name: l1xi_pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@l1xi.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
     ports:
       - "5050:80"
     volumes:

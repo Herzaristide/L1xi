@@ -1,2 +1,4 @@
 .github
 .vscode
+docker-compose.yml
+.env
