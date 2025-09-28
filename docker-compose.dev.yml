@@ -4,7 +4,7 @@ services:
   # PostgreSQL Database
   postgres:
     image: postgres:15
-    container_name: l1xi_postgres
+    container_name: l1xi_postgres_dev
     restart: unless-stopped
     environment:
       POSTGRES_USER: l1xi_user
@@ -13,7 +13,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_dev:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U l1xi_user -d l1xi_db"]
@@ -21,69 +21,64 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend API Service
+  # Backend API Service (Development)
   backend:
     build:
       context: ./backend
-      target: production
-    container_name: l1xi_backend
+      target: dev
+    container_name: l1xi_backend_dev
     restart: unless-stopped
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       DATABASE_URL: postgresql://l1xi_user:l1xi_password@postgres:5432/l1xi_db
-      JWT_SECRET: your_jwt_secret_here_change_this
+      JWT_SECRET: dev_jwt_secret_change_this
       PORT: 5000
       FRONTEND_URL: http://localhost:3000
       DESKTOP_URL: http://localhost:3001
       RATE_LIMIT_WINDOW_MS: 900000
-      RATE_LIMIT_MAX_REQUESTS: 100
+      RATE_LIMIT_MAX_REQUESTS: 1000
+      NODE_TLS_REJECT_UNAUTHORIZED: 0
     ports:
       - "5000:5000"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
+      - ./backend:/app
+      - /app/node_modules
       - ./backend/temp:/app/temp
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  # Frontend Service
+  # Frontend Service (Development)
   frontend:
     build:
       context: ./frontend
-      target: production
-    container_name: l1xi_frontend
+      target: dev
+    container_name: l1xi_frontend_dev
     restart: unless-stopped
     environment:
       VITE_API_URL: http://localhost:5000/api
     ports:
-      - "3000:80"
+      - "3000:3000"
     depends_on:
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
 
   # Redis for session storage (optional)
   redis:
     image: redis:7-alpine
-    container_name: l1xi_redis
+    container_name: l1xi_redis_dev
     restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_data_dev:/data
 
   # pgAdmin for database management (development only)
   pgadmin:
     image: dpage/pgadmin4
-    container_name: l1xi_pgadmin
+    container_name: l1xi_pgadmin_dev
     restart: unless-stopped
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@l1xi.com
@@ -91,15 +86,15 @@ services:
     ports:
       - "5050:80"
     volumes:
-      - pgadmin_data:/var/lib/pgadmin
+      - pgadmin_data_dev:/var/lib/pgadmin
     depends_on:
       - postgres
 
 volumes:
-  postgres_data:
-  redis_data:
-  pgadmin_data:
+  postgres_data_dev:
+  redis_data_dev:
+  pgadmin_data_dev:
 
 networks:
   default:
-    name: l1xi_network
+    name: l1xi_network_dev
