@@ -34,11 +34,18 @@ app.use(
   cors({
     origin: [
       process.env.FRONTEND_URL || 'http://localhost:3000',
+      'http://137.74.44.119:3000', // Direct frontend access
+      'http://137.74.44.119', // Through nginx proxy
+      'http://l1xi.4rts.xyz', // New domain
+      'https://l1xi.4rts.xyz', // HTTPS version for future
       'chrome-extension://*', // Allow chrome extension
     ],
     credentials: true,
   })
 );
+
+// Trust proxy headers
+app.set('trust proxy', 1);
 
 // Rate limiting
 const limiter = rateLimit({
@@ -47,6 +54,7 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  trustProxy: true, // Trust X-Forwarded-For header from nginx
 });
 app.use('/api/', limiter);
 

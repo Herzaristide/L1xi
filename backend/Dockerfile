@@ -23,7 +23,7 @@ CMD ["npm", "run", "dev"]
 FROM base AS builder
 WORKDIR /app
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl openssl-dev
 
 COPY package*.json ./
 RUN npm ci
@@ -39,8 +39,8 @@ RUN npx prisma generate
 FROM base AS production
 WORKDIR /app
 
-# Install curl for health checks
-RUN apk add --no-cache curl
+# Install curl and openssl-dev for health checks and Prisma compatibility
+RUN apk add --no-cache curl openssl-dev
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
@@ -50,11 +50,15 @@ RUN adduser --system --uid 1001 nodejs
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/tsconfig.json ./
 
 # Set correct permissions
 USER nodejs
+
+# Set environment variable to force Prisma to use the correct binary
+ENV PRISMA_QUERY_ENGINE_LIBRARY="/app/node_modules/.prisma/client/libquery_engine-linux-musl-openssl-3.0.x.so.node"
 
 # Expose port
 EXPOSE 5000
