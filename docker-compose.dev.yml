@@ -34,7 +34,6 @@ services:
       JWT_SECRET: dev_jwt_secret_change_this
       PORT: 5000
       FRONTEND_URL: http://localhost:3000
-      DESKTOP_URL: http://localhost:3001
       RATE_LIMIT_WINDOW_MS: 900000
       RATE_LIMIT_MAX_REQUESTS: 1000
       NODE_TLS_REJECT_UNAUTHORIZED: 0
