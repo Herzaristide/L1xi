@@ -122,6 +122,15 @@ services:
     networks:
       - l1xi_network
 
+  # Certbot for SSL certificates
+  certbot:
+    image: certbot/certbot
+    container_name: l1xi_certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    command: echo "Certbot is ready for certificate requests"
+
 volumes:
   postgres_data:
   redis_data:

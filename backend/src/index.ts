@@ -36,8 +36,8 @@ app.use(
       process.env.FRONTEND_URL || 'http://localhost:3000',
       'http://137.74.44.119:3000', // Direct frontend access
       'http://137.74.44.119', // Through nginx proxy
-      'http://l1xi.4rts.xyz', // New domain
-      'https://l1xi.4rts.xyz', // HTTPS version for future
+      'http://l1xi.4rts.xyz', // HTTP version
+      'https://l1xi.4rts.xyz', // HTTPS version
       'chrome-extension://*', // Allow chrome extension
     ],
     credentials: true,
