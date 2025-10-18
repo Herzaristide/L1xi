@@ -54,6 +54,9 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/tsconfig.json ./
 
+# Fix Prisma permissions
+RUN chown -R nodejs:nodejs /app/node_modules/.prisma
+
 # Set correct permissions
 USER nodejs
 

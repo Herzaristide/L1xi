@@ -22,9 +22,16 @@ CMD ["npm", "run", "dev"]
 # Build stage
 FROM base AS builder
 WORKDIR /app
+
+# Accept API URL as build argument
+ARG VITE_API_URL=https://l1xi.4rts.xyz/api
+
 COPY package*.json ./
 RUN npm ci
 COPY . .
+
+# Set environment variable for build
+ENV VITE_API_URL=$VITE_API_URL
 
 # Build the application
 RUN npm run build

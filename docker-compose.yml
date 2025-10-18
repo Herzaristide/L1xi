@@ -57,10 +57,12 @@ services:
     build:
       context: ./frontend
       target: production
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://l1xi.4rts.xyz/api}
     container_name: l1xi_frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:5000/api}
+      VITE_API_URL: ${VITE_API_URL:-https://l1xi.4rts.xyz/api}
     ports:
       - "3006:80"
     depends_on:

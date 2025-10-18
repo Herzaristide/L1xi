@@ -7,7 +7,9 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 
 // Import routes
+console.log('Importing routes...');
 import authRoutes from './routes/auth';
+console.log('Auth routes imported');
 import userRoutes from './routes/users';
 import languageRoutes from './routes/languages';
 import deckRoutes from './routes/decks';
@@ -15,6 +17,7 @@ import cardRoutes from './routes/cards';
 import reviewRoutes from './routes/reviews';
 import studyRoutes from './routes/study';
 import ttsRoutes from './routes/tts';
+console.log('All routes imported successfully');
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -82,7 +85,9 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
+console.log('Registering API routes...');
 app.use('/api/auth', authRoutes);
+console.log('Auth routes registered at /api/auth');
 app.use('/api/users', userRoutes);
 app.use('/api/languages', languageRoutes);
 app.use('/api/decks', deckRoutes);
@@ -90,6 +95,7 @@ app.use('/api/cards', cardRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/study', studyRoutes);
 app.use('/api/tts', ttsRoutes);
+console.log('All API routes registered');
 
 // Error handling middleware
 app.use(notFound);
